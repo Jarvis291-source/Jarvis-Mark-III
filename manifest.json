@@ -1,18 +1,19 @@
 {
   "app": "Jarvis-ZERO",
   "channel": "stable",
-  "currentVersion": "1.9.4",
-  "latestVersion": "1.9.5",
-  "build": 195,
+  "currentVersion": "1.9.5",
+  "latestVersion": "1.9.6",
+  "build": 196,
   "minimumSupportedVersion": "1.8.3",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.9.5/JarvisZero.swift",
-  "sha256": "09b5aa36145e29362bc6048531c5d45ee57bda991e02f6b22af782e225824e59",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.9.6/JarvisZero.swift",
+  "sha256": "a5866d30023e1dd8187b75788b093f4548c526cc029f6513dde9bbb9ec553203",
   "mandatory": false,
   "releaseNotes": [
-    "Claude Code darf im Entwicklermodus die gesamte interne Jarvis-Struktur frei verändern.",
-    "Starre Prüfungen auf bestimmte Funktionsnamen wurden entfernt.",
-    "Kandidaten werden stattdessen über echte Kompilierung und Signaturprüfung validiert.",
-    "Die laufende Version bleibt bis zur ausdrücklichen Installationsbestätigung unverändert."
+    "Claude Code bearbeitet jetzt eine echte Jarvis-Arbeitskopie direkt.",
+    "Read, Edit und Write sind im isolierten Entwicklungsordner freigegeben.",
+    "Starre Bindung an den bisherigen App-Typnamen wurde entfernt.",
+    "Design, Sprache, Architektur und Funktionen können dadurch tatsächlich im Quellcode geändert werden.",
+    "Kompilierung, Signaturprüfung und ausdrückliche Installationsbestätigung bleiben erhalten."
   ]
 }
