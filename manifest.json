@@ -1,0 +1,17 @@
+{
+  "app": "Jarvis-ZERO",
+  "channel": "stable",
+  "currentVersion": "1.1",
+  "latestVersion": "1.3",
+  "build": 130,
+  "minimumSupportedVersion": "1.1",
+  "updateAvailable": false,
+  "package": null,
+  "sha256": null,
+  "mandatory": false,
+  "releaseNotes": [
+    "Interner Update-Mechanismus wird vorbereitet.",
+    "Updates werden nur nach ausdrücklicher Bestätigung installiert.",
+    "Backup und Rollback sind vorgesehen."
+  ]
+}
