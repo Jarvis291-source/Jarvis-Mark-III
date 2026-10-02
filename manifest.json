@@ -1,19 +1,20 @@
 {
   "app": "Jarvis-ZERO",
   "channel": "stable",
-  "currentVersion": "2.1.5",
-  "latestVersion": "2.1.6",
-  "build": 216,
+  "currentVersion": "2.1.6",
+  "latestVersion": "2.1.7",
+  "build": 217,
   "minimumSupportedVersion": "1.8.3",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/2.1.6/JarvisZero.swift",
-  "sha256": "c1fd73387b6ef91b3fe94fcd9d87bb8d0cd97d0929abeb00f2fd372f89efe562",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/2.1.7/JarvisZero.swift",
+  "sha256": "250b29fca53f35645c12d5e35ecee4f53f09b43d2b47c057d346d367d46a2559",
   "mandatory": false,
   "releaseNotes": [
-    "Behebt die Befehlsweiterleitung im Entwicklermodus: kombinierte Entwicklungsaufträge werden nicht mehr nach der Aktivierung abgeschnitten.",
-    "Ein Befehl wie 'Geh in den Entwicklermodus und ändere ...' wird jetzt direkt an die Entwicklungsroutine weitergegeben.",
-    "Die Claude-Pro-OAuth-Anmeldung aus 2.1.5 bleibt erhalten; Bare-Modus bleibt deaktiviert.",
-    "Drei frische Claude-Entwicklungsversuche und sechs Compiler-/Reparaturzyklen bleiben aktiv.",
-    "Jarvis 2.1.6 hat Swift-Quellprüfung und vollständigen macOS-Compile-Check erfolgreich bestanden."
+    "UI-Development Upgrade für große SwiftUI- und HUD-Umbauten.",
+    "Designaufträge werden jetzt gesondert erkannt und erhalten verbindliche Regeln für einen substanziellen UI-Umbau statt bloßer Text- oder Farbänderungen.",
+    "Nach der ersten Claude-Änderung läuft bei Designaufträgen ein zweiter unabhängiger Design-Review, der fehlende UI-Bestandteile direkt im Projekt ergänzt.",
+    "Mehrteilige SwiftUI-Projekte unter Sources/UI werden ausdrücklich unterstützt; doppelte Typdefinitionen und verwaiste UI-Referenzen werden im Review geprüft.",
+    "Sprach-, Claude-, Update-, lokale KI-, Gedächtnis- und Installationslogik müssen bei Designumbauten erhalten bleiben.",
+    "Jarvis 2.1.7 hat die Swift-Quellprüfung, den vollständigen macOS-Compile-Check und einen separaten Multi-Datei-SwiftUI-HUD-Compile-Test erfolgreich bestanden."
   ]
 }
