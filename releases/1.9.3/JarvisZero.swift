@@ -437,6 +437,100 @@ struct LogLine: Identifiable { let id = UUID(); let who:String; let text:String 
             speak("Beim Aufbau des neuen Jarvis ist ein Fehler aufgetreten. Die bisherige Version bleibt erhalten.")
         }
     }
+    func installDeveloperCandidate() {
+        guard candidateReady,
+              FileManager.default.fileExists(atPath:developerCandidateAppURL.path) else {
+            awaitingDeveloperInstallConfirmation=false
+            developmentStatus="KEIN KANDIDAT"
+            speak("Es ist gerade keine geprüfte Entwicklung zur Installation vorhanden.")
+            return
+        }
+
+        awaitingDeveloperInstallConfirmation=false
+        let fm=FileManager.default
+        let home=fm.homeDirectoryForCurrentUser
+        let target=home.appendingPathComponent("Applications/Jarvis-ZERO.app",isDirectory:true)
+        let backup=home.appendingPathComponent("Applications/Jarvis-ZERO-Backup.app",isDirectory:true)
+        let desktopLink=home.appendingPathComponent("Desktop/Jarvis.app")
+        let log=home.appendingPathComponent("Desktop/Jarvis-Entwicklung.log")
+        let helper=developmentDirectory.appendingPathComponent("install-dev.sh")
+
+        let shell = """
+        #!/bin/bash
+        set -u
+        TARGET="\(target.path)"
+        BACKUP="\(backup.path)"
+        NEW="\(developerCandidateAppURL.path)"
+        LOG="\(log.path)"
+        DESKTOP_LINK="\(desktopLink.path)"
+
+        exec >>"$LOG" 2>&1
+        echo "=== JARVIS ENTWICKLERMODUS ==="
+        date
+
+        /bin/rm -rf "$BACKUP"
+        if [ -d "$TARGET" ]; then
+          /bin/cp -R "$TARGET" "$BACKUP" || exit 31
+        fi
+
+        /usr/bin/pkill -TERM -x JarvisZero 2>/dev/null || true
+        sleep 1
+
+        /bin/rm -rf "$TARGET"
+        /bin/cp -R "$NEW" "$TARGET" || {
+          /bin/rm -rf "$TARGET"
+          [ -d "$BACKUP" ] && /bin/cp -R "$BACKUP" "$TARGET"
+          exit 32
+        }
+
+        /usr/bin/xattr -dr com.apple.quarantine "$TARGET" 2>/dev/null || true
+        /usr/bin/codesign --verify --deep --strict "$TARGET" || {
+          /bin/rm -rf "$TARGET"
+          [ -d "$BACKUP" ] && /bin/cp -R "$BACKUP" "$TARGET"
+          /usr/bin/open -n "$TARGET" 2>/dev/null || true
+          exit 33
+        }
+
+        /bin/rm -rf "$DESKTOP_LINK"
+        /bin/ln -s "$TARGET" "$DESKTOP_LINK"
+        /usr/bin/open -n "$TARGET"
+        sleep 4
+
+        if /usr/bin/pgrep -x JarvisZero >/dev/null 2>&1; then
+          echo "SUCCESS"
+          exit 0
+        fi
+
+        echo "START FEHLER - ROLLBACK"
+        /bin/rm -rf "$TARGET"
+        if [ -d "$BACKUP" ]; then
+          /bin/cp -R "$BACKUP" "$TARGET"
+          /usr/bin/open -n "$TARGET" 2>/dev/null || true
+        fi
+        exit 34
+        """
+
+        do {
+            try shell.write(to:helper,atomically:true,encoding:.utf8)
+            _=runProcess("/bin/chmod",["+x",helper.path])
+            developmentStatus="INSTALLATION"
+            speak("Verstanden. Ich installiere die geprüfte Entwicklung und starte anschließend neu.")
+
+            let launcher=Process()
+            launcher.executableURL=URL(fileURLWithPath:"/usr/bin/nohup")
+            launcher.arguments=["/bin/bash",helper.path]
+            launcher.standardOutput=FileHandle.nullDevice
+            launcher.standardError=FileHandle.nullDevice
+            try launcher.run()
+
+            DispatchQueue.main.asyncAfter(deadline:.now()+1.2) {
+                NSApp.terminate(nil)
+            }
+        } catch {
+            developmentStatus="INSTALLATIONSFEHLER"
+            speak("Die Installation konnte nicht gestartet werden. Die aktuelle Version bleibt erhalten.")
+        }
+    }
     func runSelfDevelopmentCycle() async {
         guard localAI else {
             developmentStatus = "KI NICHT BEREIT"
@@ -1207,6 +1301,33 @@ struct LogLine: Identifiable { let id = UUID(); let who:String; let text:String 
     func execute(_ cmd:String) async {
         status="VERARBEITUNG"; cpuPulse=0.9
         defer { if !speaking { status=listening ? "HÖRT ZU":"BEREIT" }; cpuPulse=0.22 }
+        if cmd.contains("geh in den entwicklermodus") || cmd.contains("gehe in den entwicklermodus") || cmd.contains("entwicklermodus aktivieren") {
+            enterDeveloperMode()
+            return
+        }
+
+        if developerMode && (cmd.contains("entwicklermodus beenden") || cmd.contains("entwicklermodus verlassen")) {
+            leaveDeveloperMode()
+            return
+        }
+
+        if awaitingDeveloperInstallConfirmation {
+            if cmd == "ja" || cmd.contains("ja installieren") || cmd.contains("installieren") || cmd.contains("übernehmen") {
+                installDeveloperCandidate()
+                return
+            }
+            if cmd == "nein" || cmd.contains("nicht installieren") || cmd.contains("abbrechen") {
+                awaitingDeveloperInstallConfirmation=false
+                developmentStatus="ENTWICKLUNG BEREIT"
+                speak("In Ordnung. Die geprüfte Entwicklung bleibt gespeichert und wird nicht installiert.")
+                return
+            }
+        }
+
+        if developerMode {
+            await processDeveloperInstruction(cmd)
+            return
+        }
         if cmd.hasPrefix("mein ort ist ") || cmd.hasPrefix("mein standort ist ") {
             let location=cmd.replacingOccurrences(of:"mein ort ist ",with:"").replacingOccurrences(of:"mein standort ist ",with:"")
             setDefaultLocation(location)
@@ -1684,6 +1805,7 @@ struct JarvisView: View {
                 stat("ROUTER", core.lastRoute)
                 stat("INTERNET", core.internetStatus)
                 stat("CLAUDE CODE", core.claudeCodeStatus)
+                stat("ENTWICKLERMODUS", core.developerMode ? "AKTIV" : "AUS")
                 stat("ENTWICKLUNG", core.developmentStatus)
                 stat("UPDATE", core.updateStatus)
                 MetricBar(label: "SYSTEMLAST", value: core.cpuPulse, text: "\(Int(core.cpuPulse * 100))%")
@@ -1799,6 +1921,20 @@ struct JarvisView: View {
                         .font(.system(size: 8, weight: .bold, design: .monospaced))
                         .foregroundStyle(core.candidateReady ? .green : .cyan.opacity(0.72))
                 }
+
+                if core.candidateReady {
+                    Button("ENTWICKLUNG INSTALLIEREN") {
+                        core.installDeveloperCandidate()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+                }
+
+                Button(core.developerMode ? "ENTWICKLERMODUS AKTIV" : "ENTWICKLERMODUS") {
+                    core.developerMode ? core.leaveDeveloperMode() : core.enterDeveloperMode()
+                }
+                .buttonStyle(.bordered)
+                .tint(core.developerMode ? .green : .cyan)
 
                 Button("ENTWICKLUNGSZYKLUS STARTEN") {
                     Task { await core.runSelfDevelopmentCycle() }
@@ -1928,7 +2064,7 @@ struct JarvisView: View {
         HStack {
             Text("JARVIS // MARK V // VERSION 1.9.3")
             Spacer()
-            Text("OLLAMA • CLAUDE CODE • INTERNET • GEDÄCHTNIS • MAC-STEUERUNG • SELBSTENTWICKLUNG")
+            Text("SPRACHSTEUERUNG • OLLAMA • CLAUDE CODE • INTERNET • GEDÄCHTNIS • ENTWICKLERMODUS")
         }
         .font(.system(size: 7, weight: .semibold, design: .monospaced))
         .tracking(1.8)
