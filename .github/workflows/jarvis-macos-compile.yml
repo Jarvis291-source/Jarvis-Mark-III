@@ -1,0 +1,28 @@
+name: Jarvis macOS Compile Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'releases/**/JarvisZero.swift'
+      - '.github/workflows/jarvis-macos-compile.yml'
+  workflow_dispatch:
+
+jobs:
+  compile:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Swift version
+        run: xcrun swiftc --version
+      - name: Compile Jarvis 2.1.0
+        run: |
+          xcrun swiftc -parse-as-library releases/2.1.0/JarvisZero.swift \
+            -o /tmp/JarvisZero \
+            -framework SwiftUI \
+            -framework AppKit \
+            -framework AVFoundation \
+            -framework Speech
+          test -x /tmp/JarvisZero
