@@ -268,13 +268,13 @@ struct LogLine: Identifiable { let id = UUID(); let who:String; let text:String 
             speak(code == 0 ? "Screenshot wurde auf dem Schreibtisch gespeichert." : "Screenshot konnte ich nicht erstellen.")
             return
         }
-        if cmd.contains("stumm") || cmd.contains("mute") {
-            _=runProcess("/usr/bin/osascript",["-e","set volume output muted true"])
-            speak("Ton ist stummgeschaltet."); return
-        }
         if cmd.contains("ton an") || cmd.contains("nicht mehr stumm") || cmd.contains("unmute") {
             _=runProcess("/usr/bin/osascript",["-e","set volume output muted false"])
             speak("Ton ist wieder eingeschaltet."); return
+        }
+        if cmd.contains("stumm") || cmd.contains("mute") {
+            _=runProcess("/usr/bin/osascript",["-e","set volume output muted true"])
+            speak("Ton ist stummgeschaltet."); return
         }
         if cmd.contains("lautstärke") {
             let digits=cmd.split(whereSeparator: { !$0.isNumber }).compactMap { Int($0) }
