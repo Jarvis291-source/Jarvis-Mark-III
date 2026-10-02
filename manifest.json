@@ -2,20 +2,20 @@
   "app": "Jarvis-ZERO",
   "channel": "stable",
   "currentVersion": "1.8.3",
-  "latestVersion": "1.9",
-  "build": 190,
+  "latestVersion": "1.9.1",
+  "build": 191,
   "minimumSupportedVersion": "1.8.3",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.9/JarvisZero.swift",
-  "sha256": "2bdf6b311e23cdb3c26bf48cf3fce91e7f4e5cf7669813e405ce1c60630a3945",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.9.1/JarvisZero.swift",
+  "sha256": "d77ec53d038d45282e3dce72de5be2761da54342c2e7d58d7c6aeb3b2a6d114b",
   "mandatory": false,
   "releaseNotes": [
-    "Lokales lernendes Gedächtnis mit dauerhafter Speicherung.",
-    "Gesprächskontext wird für natürlichere KI-Antworten mitgeführt.",
-    "Allgemeinere Mac-Steuerung: Programme, Standardordner und gefundene Dateien lassen sich öffnen.",
-    "Neue Sprachbefehle zum Merken von Informationen.",
-    "Selbstentwicklungsmodus erstellt lokale Entwicklungskandidaten und kompiliert sie zur Prüfung.",
-    "Ein Kandidat ersetzt die laufende Jarvis-App nicht automatisch.",
-    "Update-Zentrale behält den Button ERNEUT NACH UPDATE SUCHEN."
+    "Automatisches Routing entscheidet selbst zwischen Mac, Gedächtnis, Wetter, Nachrichten, Internet und lokaler KI.",
+    "Wetterabfragen über Open-Meteo ohne API-Schlüssel.",
+    "Aktuelle Nachrichten werden online abgerufen.",
+    "Aktuelle allgemeine Fragen können über eine Websuche beantwortet und von der lokalen KI zusammengefasst werden.",
+    "Standardort kann per Sprachbefehl gespeichert werden: Mein Ort ist ...",
+    "Ollama ist weiterhin optional vorbereitet und wird für normale Wissensfragen sowie die intelligente Routing-Entscheidung genutzt.",
+    "Update-Rettungsbutton bleibt dauerhaft vorhanden."
   ]
 }
