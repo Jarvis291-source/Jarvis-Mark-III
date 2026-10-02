@@ -5,13 +5,15 @@
   "latestVersion": "1.3",
   "build": 130,
   "minimumSupportedVersion": "1.1",
-  "updateAvailable": false,
-  "package": null,
-  "sha256": null,
+  "updateAvailable": true,
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.3/JarvisZero.swift",
+  "sha256": "5dcf966f7ca711255a141d9ba1f53c75e1619ebd7879a937ce056bca31095e57",
   "mandatory": false,
   "releaseNotes": [
-    "Interner Update-Mechanismus wird vorbereitet.",
-    "Updates werden nur nach ausdrücklicher Bestätigung installiert.",
-    "Backup und Rollback sind vorgesehen."
+    "MARK III 1.3 mit internem Update-System.",
+    "Update-Prüfung direkt über GitHub.",
+    "SHA-256-Prüfung vor Installation.",
+    "Backup vor Austausch der App.",
+    "Installation nur nach ausdrücklicher Bestätigung."
   ]
 }
