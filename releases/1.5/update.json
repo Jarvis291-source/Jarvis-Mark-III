@@ -1,0 +1,14 @@
+{
+  "version": "1.5",
+  "build": 150,
+  "status": "released",
+  "installMode": "user-confirmed",
+  "sourceFile": "JarvisZero.swift",
+  "sourceURL": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.5/JarvisZero.swift",
+  "sha256": "cf3da2e46b3c15ae982d325e69120e0a3e7035f64ae004a8e4f8319a4298b47f",
+  "testPurpose": "Verify complete self-update path from installed 1.4 to 1.5.",
+  "visibleChanges": [
+    "Footer shows BUILD 1.5",
+    "Update panel shows GITHUB CHANNEL • LIVE"
+  ]
+}
