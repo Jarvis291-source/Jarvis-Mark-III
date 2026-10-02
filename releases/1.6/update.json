@@ -1,0 +1,20 @@
+{
+  "version": "1.6",
+  "build": 160,
+  "status": "released",
+  "installMode": "user-confirmed",
+  "sourceFile": "JarvisZero.swift",
+  "sourceURL": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.6/JarvisZero.swift",
+  "sha256": "567ff8ed6cf326ee6ee8731e2447fd2aaa412ca7b2cc6e78518214ec696e4863",
+  "automaticChecks": "every 15 minutes",
+  "features": [
+    "Automatic Ollama model detection",
+    "Open System Settings",
+    "Open Calculator",
+    "Create screenshots",
+    "Set output volume",
+    "Mute and unmute audio",
+    "Voice-triggered update check",
+    "Visible active local AI model"
+  ]
+}
