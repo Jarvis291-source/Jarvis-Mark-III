@@ -1,17 +1,20 @@
 {
   "app": "Jarvis-ZERO",
   "channel": "stable",
-  "currentVersion": "1.7.3",
-  "latestVersion": "1.7.4",
-  "build": 174,
-  "minimumSupportedVersion": "1.7.3",
+  "currentVersion": "1.7.4",
+  "latestVersion": "1.8",
+  "build": 180,
+  "minimumSupportedVersion": "1.7.4",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.7.4/JarvisZero.swift",
-  "sha256": "40cb118d6e091f628b5a4cd52ee18188abc1cc63518297f69a0303cfb4a712ef",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.8/JarvisZero.swift",
+  "sha256": "52d2d7b33d19475489d89a29401f7d97ff0555ee81783e5232e060bf54cdbd7c",
   "mandatory": false,
   "releaseNotes": [
-    "Reines End-to-End-Testupdate für den eingebauten Updater.",
-    "Keine wesentlichen Funktionsänderungen gegenüber 1.7.3.",
-    "Ziel: Update finden, installieren, Jarvis neu starten und BUILD 1.7.4 anzeigen."
+    "MARK V: deutlich futuristischeres holografisches HUD.",
+    "Neue deutsche JARVIS-inspirierte Stimme mit bevorzugter männlicher de-DE Enhanced-Stimme.",
+    "Flüssigere deutsche Sprachausgabe mit angepasstem Tempo, Tonhöhe und kurzen Übergängen.",
+    "Neuer SPEAKING-Modus: Core, Ringe, Glow und Audio-Balken reagieren während Jarvis spricht.",
+    "Automatischer Wechsel zurück zu LISTENING nach der Antwort.",
+    "VOICE PROFILE zeigt die tatsächlich gewählte macOS-Stimme."
   ]
 }
