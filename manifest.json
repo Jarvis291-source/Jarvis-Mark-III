@@ -1,20 +1,19 @@
 {
   "app": "Jarvis-ZERO",
   "channel": "stable",
-  "currentVersion": "1.9.1",
-  "latestVersion": "1.9.2",
-  "build": 192,
+  "currentVersion": "1.9.2",
+  "latestVersion": "1.9.3",
+  "build": 193,
   "minimumSupportedVersion": "1.8.3",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.9.2/JarvisZero.swift",
-  "sha256": "a721c0a0cbde72a8fba4bc573e425b1562245bfb3a3e85707deab85ec4eada63",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.9.3/JarvisZero.swift",
+  "sha256": "f52688bcd425fce124a00a2be72f8651e976cbf2f1f7348ab7dddadf114f52b4",
   "mandatory": false,
   "releaseNotes": [
-    "Claude Code wird automatisch erkannt und als Entwickler-KI verwendet.",
-    "Ollama bleibt die lokale Alltags-KI für Gespräche, Routing und normale Antworten.",
-    "Selbstentwicklung nutzt bevorzugt Claude Code und fällt bei Bedarf auf Ollama zurück.",
-    "Claude Code wird im Hintergrund per Headless-Modus für Codeentwürfe aufgerufen.",
-    "Keine automatische Installation eines Entwicklungskandidaten.",
-    "Internet, Wetter, Nachrichten, Gedächtnis und Mac-Steuerung bleiben erhalten."
+    "Sprachgesteuerter Entwicklermodus.",
+    "Claude Code erstellt und prüft Entwicklungskandidaten.",
+    "Gesprochene Installationsbestätigung nach erfolgreicher Prüfung.",
+    "Natürlichere deutsche Sprachausgabe.",
+    "Backup und Wiederherstellung bleiben erhalten."
   ]
 }
