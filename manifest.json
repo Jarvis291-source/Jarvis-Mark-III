@@ -1,23 +1,22 @@
 {
   "app": "Jarvis-ZERO",
   "channel": "stable",
-  "currentVersion": "2.0.2",
-  "latestVersion": "2.1.0",
-  "build": 210,
+  "currentVersion": "2.1.0",
+  "latestVersion": "2.1.2",
+  "build": 212,
   "minimumSupportedVersion": "1.8.3",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/2.1.0/JarvisZero.swift",
-  "sha256": "cb8b827e6003d79da9f4bc40e0658ccef5fd0f4e1bdb2eb3df0d7bd445ef9175",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/2.1.2/JarvisZero.swift",
+  "sha256": "e2b6e352b2dc9e9f2239c9ffcf55aa22c8f3e6c3d975f0eb8e8eb03bba977f8c",
   "mandatory": false,
   "releaseNotes": [
-    "Claude Code darf den vollständigen Jarvis-Projektordner mit mehreren Swift-Dateien neu programmieren.",
-    "Claude-Aufruf nach aktueller Anthropic-CLI-Dokumentation mit eingeschränkten und freigegebenen Dateiwerkzeugen.",
-    "Kein künstliches max-turns-Limit mehr, das geänderte Projekte fälschlich als Fehler verwerfen kann.",
-    "Bis zu drei automatische Build-Durchläufe; Compilerfehler werden zur Reparatur an Claude zurückgegeben.",
-    "Jede erfolgreiche lokale Claude-Entwicklung erhält automatisch die nächste Jarvis-Versionsnummer.",
-    "Versionsanzeige und Updater lesen die installierte Bundle-Version statt einer fest codierten Entwicklernummer.",
-    "Claude- und Compilerdiagnosen bleiben dauerhaft gespeichert.",
-    "Backup, Codesign-Prüfung, ausdrückliche Installationsbestätigung und Rollback bleiben aktiv.",
-    "Jarvis 2.1.0 wurde erfolgreich auf einem macOS GitHub Actions Runner kompiliert."
+    "Recovery für den in 2.1.1 beobachteten AVAudioEngine-Laufzeitabsturz.",
+    "Neue Claude-Projekte einer abgestürzten oder abweichenden Version werden nicht erneut als Entwicklungsbasis verwendet.",
+    "Der stabile veröffentlichte Quellstand wird bei Versionsabweichung automatisch neu als Projektbasis angelegt.",
+    "Claude erhält zusätzliche Audio-Laufzeitsicherheitsregeln für AVAudioEngine, installTap und Audioformate.",
+    "Compilerfehler werden weiterhin automatisch an Claude zur Reparatur zurückgegeben.",
+    "Automatische Versionsnummern für erfolgreiche Claude-Entwicklungen bleiben aktiv.",
+    "Nach einer Entwicklerinstallation wird Jarvis jetzt 20 Sekunden überwacht; ein früher Prozessabsturz löst automatisch Rollback aus.",
+    "Jarvis 2.1.2 hat sowohl die Swift-Quellprüfung als auch den vollständigen macOS-Compile-Check bestanden."
   ]
 }
