@@ -1,19 +1,19 @@
 {
   "app": "Jarvis-ZERO",
   "channel": "stable",
-  "currentVersion": "1.6.1",
-  "latestVersion": "1.7",
-  "build": 170,
+  "currentVersion": "1.7",
+  "latestVersion": "1.7.1",
+  "build": 171,
   "minimumSupportedVersion": "1.6.1",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.7/JarvisZero.swift",
-  "sha256": "15ccad671fc9027a426f49544ebb6e53d2430860a79fd6387aaf7b763c9ab928",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.7.1/JarvisZero.swift",
+  "sha256": "d8e9784edb603e8377a76b8be02f1d19f217ce2039fa3286c4a157cf4c19169e",
   "mandatory": false,
   "releaseNotes": [
-    "MARK IV FUTURE HUD: komplett neue holografische Jarvis-Oberfläche.",
-    "Neuer animierter zentraler Intelligence-Core mit Mehrfachringen und Puls.",
-    "Scanner-Licht, Telemetrie, Command Matrix und Live Data Stream.",
-    "Neues Update-Uplink-Panel und futuristische Command-Eingabe.",
-    "Bestehende Sprach-, Mac-, lokale KI- und Update-Funktionen bleiben erhalten."
+    "Updater-Fix: Installation ersetzt die App erst nach erfolgreicher Kompilierung.",
+    "Nach erfolgreicher Installation beendet sich Jarvis und startet automatisch neu.",
+    "Neue App wird per codesign geprüft und der laufende Prozess kontrolliert.",
+    "Bei Startfehler wird automatisch das Backup wiederhergestellt.",
+    "MARK IV Future HUD aus 1.7 bleibt enthalten."
   ]
 }
