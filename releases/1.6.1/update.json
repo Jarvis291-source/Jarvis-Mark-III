@@ -1,0 +1,10 @@
+{
+  "version": "1.6.1",
+  "build": 161,
+  "status": "released",
+  "installMode": "user-confirmed",
+  "sourceFile": "JarvisZero.swift",
+  "sourceURL": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.6.1/JarvisZero.swift",
+  "sha256": "01eae410bce5c36d7855e51c489cfeb9374273bfb3a9b4458c01752d9cff8913",
+  "notes": "Updater diagnostics and GitHub API fallback."
+}
