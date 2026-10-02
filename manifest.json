@@ -1,19 +1,17 @@
 {
   "app": "Jarvis-ZERO",
   "channel": "stable",
-  "currentVersion": "1.7.1",
-  "latestVersion": "1.7.2",
-  "build": 172,
-  "minimumSupportedVersion": "1.7.1",
+  "currentVersion": "1.7.3",
+  "latestVersion": "1.7.4",
+  "build": 174,
+  "minimumSupportedVersion": "1.7.3",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.7.2/JarvisZero.swift",
-  "sha256": "d74e8cfb18fe23733eacebcaa1b1b595a8fc96264832becedb489ac2003edbe9",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.7.4/JarvisZero.swift",
+  "sha256": "40cb118d6e091f628b5a4cd52ee18188abc1cc63518297f69a0303cfb4a712ef",
   "mandatory": false,
   "releaseNotes": [
-    "End-to-End-Test des eingebauten Updaters.",
-    "Installation ersetzt Jarvis erst nach erfolgreicher Kompilierung und Prüfung.",
-    "Jarvis beendet sich nach Installation und startet automatisch neu.",
-    "Desktop-Button Jarvis.app wird automatisch erneuert.",
-    "Bei Startfehler wird die vorherige Version automatisch wiederhergestellt."
+    "Reines End-to-End-Testupdate für den eingebauten Updater.",
+    "Keine wesentlichen Funktionsänderungen gegenüber 1.7.3.",
+    "Ziel: Update finden, installieren, Jarvis neu starten und BUILD 1.7.4 anzeigen."
   ]
 }
