@@ -1,0 +1,11 @@
+{
+  "version": "1.4",
+  "build": 140,
+  "status": "released",
+  "installMode": "user-confirmed",
+  "sourceFile": "JarvisZero.swift",
+  "sourceURL": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.4/JarvisZero.swift",
+  "sha256": "2aa8c221127d109b6683337134cf8ac30291421ad2131f0dd1fd8b07fe3afd89",
+  "automaticChecks": "hourly",
+  "notes": "Erste stabile Bootstrap-Version mit periodischer Update-Pruefung, SHA-256, Backup und bestaetigter Installation."
+}
