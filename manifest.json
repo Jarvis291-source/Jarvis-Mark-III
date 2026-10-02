@@ -1,22 +1,22 @@
 {
   "app": "Jarvis-ZERO",
   "channel": "stable",
-  "currentVersion": "2.1.3",
-  "latestVersion": "2.1.4",
-  "build": 214,
+  "currentVersion": "2.1.4",
+  "latestVersion": "2.1.5",
+  "build": 215,
   "minimumSupportedVersion": "1.8.3",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/2.1.4/JarvisZero.swift",
-  "sha256": "f909301489e70b981b856fad1ab19f3aaa483edfbe71a735cd0161f49d8c48c2",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/2.1.5/JarvisZero.swift",
+  "sha256": "37624dda52bc215a44ee885a8d4240114f849703741ae9843693b5108b1ca4e9",
   "mandatory": false,
   "releaseNotes": [
-    "Claude-Dateiänderungen werden jetzt mit bis zu drei frischen Entwicklungsaufrufen versucht, bevor Jarvis abbricht.",
-    "Die zusätzliche permission-prompts-none-Regel wurde entfernt, damit der nicht-interaktive acceptEdits-Modus Dateiänderungen nicht unnötig blockiert.",
-    "Claude-Ausgabe verwendet wieder den einfacheren Textmodus statt erzwungenem JSON.",
-    "Bei drei erfolglosen Läufen schreibt Jarvis eine eigene Claude-Diagnose.txt.",
-    "Die sechs nachgelagerten Compiler-/Reparaturzyklen aus 2.1.3 bleiben erhalten.",
-    "Spezielle sichere Regeln für reine Stimmänderungen bleiben aktiv.",
-    "20-Sekunden-Laufzeitüberwachung und Rollback bleiben aktiv.",
-    "Jarvis 2.1.4 hat den vollständigen macOS-Compile-Check erfolgreich bestanden."
+    "Behebt die eigentliche Claude-Pro-Authentifizierungsursache: Bare-Modus wurde vollständig entfernt.",
+    "Claude Code kann wieder die vorhandene Claude-Pro-OAuth-Anmeldung und den macOS-Schlüsselbund verwenden.",
+    "Jarvis prüft jetzt zusätzlich mit claude auth status, ob Claude Code tatsächlich angemeldet ist.",
+    "Die Claude-Statusanzeige unterscheidet zwischen installiert und wirklich angemeldet.",
+    "HOME und PATH werden dem aus Jarvis gestarteten Claude-Prozess explizit mitgegeben.",
+    "Drei frische Entwicklungsversuche und sechs Compiler-/Reparaturzyklen bleiben aktiv.",
+    "Stimm-, Design- und Funktionsänderungen laufen wieder über denselben authentifizierten Claude-Entwicklungsweg.",
+    "Jarvis 2.1.5 hat Swift-Quellprüfung und vollständigen macOS-Compile-Check erfolgreich bestanden."
   ]
 }
