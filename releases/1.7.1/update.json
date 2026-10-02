@@ -1,0 +1,11 @@
+{
+  "version": "1.7.1",
+  "build": 171,
+  "status": "released",
+  "installMode": "user-confirmed",
+  "sourceURL": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.7.1/JarvisZero.swift",
+  "sha256": "d8e9784edb603e8377a76b8be02f1d19f217ce2039fa3286c4a157cf4c19169e",
+  "restartRequired": true,
+  "rollback": true,
+  "notes": "Reliable updater: compile, verify, backup, replace, restart, health-check, rollback."
+}
