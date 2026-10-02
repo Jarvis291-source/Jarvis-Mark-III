@@ -1,18 +1,23 @@
 {
   "app": "Jarvis-ZERO",
   "channel": "stable",
-  "currentVersion": "2.0.1",
-  "latestVersion": "2.0.2",
-  "build": 202,
+  "currentVersion": "2.0.2",
+  "latestVersion": "2.1.0",
+  "build": 210,
   "minimumSupportedVersion": "1.8.3",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/2.0.2/JarvisZero.swift",
-  "sha256": "9a74f7dd6f0da090a53b59173f6dd642bbb23b1d856a9a99f6c241a23f07b7b2",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/2.1.0/JarvisZero.swift",
+  "sha256": "cb8b827e6003d79da9f4bc40e0658ccef5fd0f4e1bdb2eb3df0d7bd445ef9175",
   "mandatory": false,
   "releaseNotes": [
-    "Korrigiert den Claude-Code-Aufruf für die direkte Projektbearbeitung.",
-    "Verwendet den offiziellen --tools-Parameter für Read, Edit, Write, Glob und Grep.",
-    "Claude-Ausgabe und Fehler bleiben nach Entwicklungsversuchen zur Diagnose gespeichert.",
-    "Mehrdateien-Workspace, technische Prüfung, Backup und Installationsbestätigung bleiben erhalten."
+    "Claude Code darf den vollständigen Jarvis-Projektordner mit mehreren Swift-Dateien neu programmieren.",
+    "Claude-Aufruf nach aktueller Anthropic-CLI-Dokumentation mit eingeschränkten und freigegebenen Dateiwerkzeugen.",
+    "Kein künstliches max-turns-Limit mehr, das geänderte Projekte fälschlich als Fehler verwerfen kann.",
+    "Bis zu drei automatische Build-Durchläufe; Compilerfehler werden zur Reparatur an Claude zurückgegeben.",
+    "Jede erfolgreiche lokale Claude-Entwicklung erhält automatisch die nächste Jarvis-Versionsnummer.",
+    "Versionsanzeige und Updater lesen die installierte Bundle-Version statt einer fest codierten Entwicklernummer.",
+    "Claude- und Compilerdiagnosen bleiben dauerhaft gespeichert.",
+    "Backup, Codesign-Prüfung, ausdrückliche Installationsbestätigung und Rollback bleiben aktiv.",
+    "Jarvis 2.1.0 wurde erfolgreich auf einem macOS GitHub Actions Runner kompiliert."
   ]
 }
