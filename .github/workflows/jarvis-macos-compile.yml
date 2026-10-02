@@ -17,9 +17,9 @@ jobs:
         uses: actions/checkout@v4
       - name: Swift version
         run: xcrun swiftc --version
-      - name: Compile Jarvis 2.1.8
+      - name: Compile Jarvis 2.1.9
         run: |
-          xcrun swiftc -parse-as-library releases/2.1.8/JarvisZero.swift \
+          xcrun swiftc -parse-as-library releases/2.1.9/JarvisZero.swift \
             -o /tmp/JarvisZero \
             -framework SwiftUI \
             -framework AppKit \
@@ -73,3 +73,22 @@ jobs:
           SWIFT
           xcrun swiftc -parse-as-library             /tmp/JarvisHUDSmoke/Main.swift             /tmp/JarvisHUDSmoke/HUD.swift             -o /tmp/JarvisHUDSmoke/JarvisHUDSmoke             -framework SwiftUI             -framework AppKit
           test -x /tmp/JarvisHUDSmoke/JarvisHUDSmoke
+
+      - name: Compile actual split developer workspace
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/JarvisSplitWorkspace
+          mkdir -p /tmp/JarvisSplitWorkspace/Sources/Core /tmp/JarvisSplitWorkspace/Sources/UI
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path("releases/2.1.9/JarvisZero.swift").read_text()
+          marker = "\n\nstruct ArcRing: View {"
+          assert marker in source, "UI split marker missing"
+          core, ui = source.split(marker, 1)
+          Path("/tmp/JarvisSplitWorkspace/Sources/Core/JarvisCore.swift").write_text(core.strip() + "\n")
+          Path("/tmp/JarvisSplitWorkspace/Sources/UI/JarvisHUD.swift").write_text(
+              "import SwiftUI\nimport AppKit\nimport Foundation\nimport Combine\n\nstruct ArcRing: View {" + ui
+          )
+          PY
+          xcrun swiftc -parse-as-library             /tmp/JarvisSplitWorkspace/Sources/Core/JarvisCore.swift             /tmp/JarvisSplitWorkspace/Sources/UI/JarvisHUD.swift             -o /tmp/JarvisSplitWorkspace/JarvisZero             -framework SwiftUI             -framework AppKit             -framework AVFoundation             -framework Speech
+          test -x /tmp/JarvisSplitWorkspace/JarvisZero
