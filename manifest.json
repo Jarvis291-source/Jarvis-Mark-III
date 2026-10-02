@@ -1,19 +1,19 @@
 {
   "app": "Jarvis-ZERO",
   "channel": "stable",
-  "currentVersion": "1.9.2",
-  "latestVersion": "1.9.3",
-  "build": 193,
+  "currentVersion": "1.9.3",
+  "latestVersion": "1.9.4",
+  "build": 194,
   "minimumSupportedVersion": "1.8.3",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.9.3/JarvisZero.swift",
-  "sha256": "f52688bcd425fce124a00a2be72f8651e976cbf2f1f7348ab7dddadf114f52b4",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.9.4/JarvisZero.swift",
+  "sha256": "aea4b0ed2bac74c73209fc2d5e2c5fa464ab0fd328a2efdf7df49ab3047f03f8",
   "mandatory": false,
   "releaseNotes": [
-    "Sprachgesteuerter Entwicklermodus.",
-    "Claude Code erstellt und prüft Entwicklungskandidaten.",
-    "Gesprochene Installationsbestätigung nach erfolgreicher Prüfung.",
-    "Natürlichere deutsche Sprachausgabe.",
-    "Backup und Wiederherstellung bleiben erhalten."
+    "Behebt den Hänger bei großen Claude-Code-Ausgaben.",
+    "Claude-Code-Ausgaben werden jetzt dateibasiert verarbeitet.",
+    "Entwicklermodus zeigt eine Fortschrittsleiste mit Prozentanzeige.",
+    "Statusschritte: Quellcode laden, Claude Code, kompilieren, signieren und Entwicklung bereit.",
+    "Zeitlimit verhindert endloses Warten auf Claude Code."
   ]
 }
