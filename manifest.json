@@ -2,18 +2,20 @@
   "app": "Jarvis-ZERO",
   "channel": "stable",
   "currentVersion": "1.9.5",
-  "latestVersion": "1.9.6",
-  "build": 196,
+  "latestVersion": "2.0",
+  "build": 200,
   "minimumSupportedVersion": "1.8.3",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.9.6/JarvisZero.swift",
-  "sha256": "a5866d30023e1dd8187b75788b093f4548c526cc029f6513dde9bbb9ec553203",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/2.0/JarvisZero.swift",
+  "sha256": "80992fbec64d6f9e3f729e203a77bcd3853c20b87be1e590e7bf09c772d5207f",
   "mandatory": false,
   "releaseNotes": [
-    "Claude Code bearbeitet jetzt eine echte Jarvis-Arbeitskopie direkt.",
-    "Read, Edit und Write sind im isolierten Entwicklungsordner freigegeben.",
-    "Starre Bindung an den bisherigen App-Typnamen wurde entfernt.",
-    "Design, Sprache, Architektur und Funktionen können dadurch tatsächlich im Quellcode geändert werden.",
-    "Kompilierung, Signaturprüfung und ausdrückliche Installationsbestätigung bleiben erhalten."
+    "Enthält alle bisher für 1.9.6 vorgesehenen Claude-Code-Verbesserungen.",
+    "Neuer vollständiger Jarvis-2.0-Developer-Workspace statt nur einer einzelnen Swift-Arbeitskopie.",
+    "Claude Code darf das Projekt in mehrere Swift-Dateien und Unterordner aufteilen und die Grundarchitektur neu strukturieren.",
+    "Read, Edit, Write, Glob und Grep sind im isolierten Jarvis-Projektarbeitsbereich freigegeben.",
+    "Alle Swift-Module des Projekts werden gemeinsam kompiliert und anschließend signiert geprüft.",
+    "Design, Sprachsystem, KI-Router, Speicher, Zustände und App-Struktur können vollständig neu aufgebaut werden.",
+    "Installation erfolgt weiterhin erst nach ausdrücklicher Bestätigung mit Backup und Rollback."
   ]
 }
