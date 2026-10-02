@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'releases/2.1.5/JarvisZero.swift'
+      - 'releases/2.1.6/JarvisZero.swift'
       - '.github/workflows/validate-swift.yml'
   workflow_dispatch:
 
@@ -18,4 +18,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          swiftc -parse releases/2.1.5/JarvisZero.swift
+          swiftc -parse releases/2.1.6/JarvisZero.swift
