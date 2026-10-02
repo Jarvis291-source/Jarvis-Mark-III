@@ -2,19 +2,18 @@
   "app": "Jarvis-ZERO",
   "channel": "stable",
   "currentVersion": "1.8",
-  "latestVersion": "1.8.1",
-  "build": 181,
+  "latestVersion": "1.8.2",
+  "build": 182,
   "minimumSupportedVersion": "1.8",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.8.1/JarvisZero.swift",
-  "sha256": "50ddd1da84f638df589534ec895cef74dd88b1e32dff29c5f8e8e2c35704b358",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.8.2/JarvisZero.swift",
+  "sha256": "a05b4ead4fcf7231691bb2cdcfa0fbec07964319ae028ee3676718b1584cef15",
   "mandatory": false,
   "releaseNotes": [
-    "Komplette sichtbare Benutzeroberfläche auf Deutsch umgestellt.",
-    "Statusanzeigen wie HÖRT ZU, SPRICHT, VERARBEITUNG und BEREIT sind jetzt deutsch.",
-    "Neue KI-Einrichtung direkt in Jarvis.",
-    "Jarvis erkennt Ollama, startet den lokalen Dienst und kann qwen2.5:3b nach Bestätigung laden.",
-    "Normale Fragen werden automatisch an die lokale KI weitergegeben.",
-    "Mac-Befehle bleiben direkt und funktionieren weiterhin ohne KI."
+    "Behebt den Swift-Kompilierfehler aus 1.8.1.",
+    "Komplette sichtbare Oberfläche bleibt auf Deutsch.",
+    "Lokale KI-Einrichtung über Ollama bleibt enthalten.",
+    "Jarvis kann qwen2.5:3b nach Bestätigung lokal laden.",
+    "Normale Fragen gehen an die lokale KI; Mac-Befehle bleiben direkt."
   ]
 }
