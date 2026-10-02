@@ -1,21 +1,20 @@
 {
   "app": "Jarvis-ZERO",
   "channel": "stable",
-  "currentVersion": "1.8.3",
-  "latestVersion": "1.9.1",
-  "build": 191,
+  "currentVersion": "1.9.1",
+  "latestVersion": "1.9.2",
+  "build": 192,
   "minimumSupportedVersion": "1.8.3",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.9.1/JarvisZero.swift",
-  "sha256": "d77ec53d038d45282e3dce72de5be2761da54342c2e7d58d7c6aeb3b2a6d114b",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.9.2/JarvisZero.swift",
+  "sha256": "a721c0a0cbde72a8fba4bc573e425b1562245bfb3a3e85707deab85ec4eada63",
   "mandatory": false,
   "releaseNotes": [
-    "Automatisches Routing entscheidet selbst zwischen Mac, Gedächtnis, Wetter, Nachrichten, Internet und lokaler KI.",
-    "Wetterabfragen über Open-Meteo ohne API-Schlüssel.",
-    "Aktuelle Nachrichten werden online abgerufen.",
-    "Aktuelle allgemeine Fragen können über eine Websuche beantwortet und von der lokalen KI zusammengefasst werden.",
-    "Standardort kann per Sprachbefehl gespeichert werden: Mein Ort ist ...",
-    "Ollama ist weiterhin optional vorbereitet und wird für normale Wissensfragen sowie die intelligente Routing-Entscheidung genutzt.",
-    "Update-Rettungsbutton bleibt dauerhaft vorhanden."
+    "Claude Code wird automatisch erkannt und als Entwickler-KI verwendet.",
+    "Ollama bleibt die lokale Alltags-KI für Gespräche, Routing und normale Antworten.",
+    "Selbstentwicklung nutzt bevorzugt Claude Code und fällt bei Bedarf auf Ollama zurück.",
+    "Claude Code wird im Hintergrund per Headless-Modus für Codeentwürfe aufgerufen.",
+    "Keine automatische Installation eines Entwicklungskandidaten.",
+    "Internet, Wetter, Nachrichten, Gedächtnis und Mac-Steuerung bleiben erhalten."
   ]
 }
