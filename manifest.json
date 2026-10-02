@@ -1,21 +1,21 @@
 {
   "app": "Jarvis-ZERO",
   "channel": "stable",
-  "currentVersion": "2.1.7",
-  "latestVersion": "2.1.8",
-  "build": 218,
+  "currentVersion": "2.1.8",
+  "latestVersion": "2.1.9",
+  "build": 219,
   "minimumSupportedVersion": "1.8.3",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/2.1.8/JarvisZero.swift",
-  "sha256": "d1ca48422c0c89e1297c0e2cdf3b678f1d3d9a8ac1a5e80b202cb0b06aab8b0e",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/2.1.9/JarvisZero.swift",
+  "sha256": "afdd8e93447a742b8fd565be6f0e3f7c846c60b223c9fd502b8291b5077e00d4",
   "mandatory": false,
   "releaseNotes": [
-    "UI-Development Upgrade für große SwiftUI- und HUD-Umbauten.",
-    "Version 2.1.8 liegt bewusst über lokal durch Claude erzeugten 2.1.7-Entwicklungskandidaten.",
-    "Designaufträge werden gesondert erkannt und müssen einen substanziellen UI-Umbau erzeugen; reine Text-, Überschrift- oder Farbänderungen reichen nicht.",
-    "Nach Claudes erster Designänderung läuft ein zweiter unabhängiger UI-Review.",
-    "Mehrteilige SwiftUI-Projekte unter Sources/UI werden unterstützt und gemeinsam kompiliert.",
-    "Sprach-, Claude-, Update-, lokale KI-, Gedächtnis- und Installationslogik bleiben geschützt.",
-    "2.1.8 hat Swift-Quellprüfung, vollständigen macOS-Compile-Check und Multi-Datei-SwiftUI-HUD-Test erfolgreich bestanden."
+    "Developer Workspace Architecture Fix.",
+    "Jarvis trennt den stabilen Kern vor jedem neuen Claude-Projekt automatisch von der SwiftUI-Oberfläche.",
+    "Claude bearbeitet Designaufträge primär in Sources/UI/JarvisHUD.swift statt im bisherigen großen Monolithen.",
+    "Eine CLAUDE.md beschreibt Claude die Projektarchitektur und schützt Sprach-, Update-, KI-, Memory-, Installations- und Rollback-Logik.",
+    "Bei Designaufträgen akzeptiert Jarvis einen Versuch nur, wenn sich die UI-Dateien tatsächlich verändert haben.",
+    "Claude-Verbose-Protokollierung wurde für bessere Diagnosen aktiviert.",
+    "2.1.9 hat Quellprüfung, vollständigen macOS-Build, Multi-Datei-HUD-Test und den realen Core/UI-Split-Compile-Test erfolgreich bestanden."
   ]
 }
