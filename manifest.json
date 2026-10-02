@@ -1,20 +1,20 @@
 {
   "app": "Jarvis-ZERO",
   "channel": "stable",
-  "currentVersion": "1.7.4",
-  "latestVersion": "1.8",
-  "build": 180,
-  "minimumSupportedVersion": "1.7.4",
+  "currentVersion": "1.8",
+  "latestVersion": "1.8.1",
+  "build": 181,
+  "minimumSupportedVersion": "1.8",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.8/JarvisZero.swift",
-  "sha256": "52d2d7b33d19475489d89a29401f7d97ff0555ee81783e5232e060bf54cdbd7c",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.8.1/JarvisZero.swift",
+  "sha256": "50ddd1da84f638df589534ec895cef74dd88b1e32dff29c5f8e8e2c35704b358",
   "mandatory": false,
   "releaseNotes": [
-    "MARK V: deutlich futuristischeres holografisches HUD.",
-    "Neue deutsche JARVIS-inspirierte Stimme mit bevorzugter männlicher de-DE Enhanced-Stimme.",
-    "Flüssigere deutsche Sprachausgabe mit angepasstem Tempo, Tonhöhe und kurzen Übergängen.",
-    "Neuer SPEAKING-Modus: Core, Ringe, Glow und Audio-Balken reagieren während Jarvis spricht.",
-    "Automatischer Wechsel zurück zu LISTENING nach der Antwort.",
-    "VOICE PROFILE zeigt die tatsächlich gewählte macOS-Stimme."
+    "Komplette sichtbare Benutzeroberfläche auf Deutsch umgestellt.",
+    "Statusanzeigen wie HÖRT ZU, SPRICHT, VERARBEITUNG und BEREIT sind jetzt deutsch.",
+    "Neue KI-Einrichtung direkt in Jarvis.",
+    "Jarvis erkennt Ollama, startet den lokalen Dienst und kann qwen2.5:3b nach Bestätigung laden.",
+    "Normale Fragen werden automatisch an die lokale KI weitergegeben.",
+    "Mac-Befehle bleiben direkt und funktionieren weiterhin ohne KI."
   ]
 }
