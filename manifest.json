@@ -1,18 +1,18 @@
 {
   "app": "Jarvis-ZERO",
   "channel": "stable",
-  "currentVersion": "1.9.5",
-  "latestVersion": "2.0.1",
-  "build": 201,
+  "currentVersion": "2.0.1",
+  "latestVersion": "2.0.2",
+  "build": 202,
   "minimumSupportedVersion": "1.8.3",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/2.0.1/JarvisZero.swift",
-  "sha256": "ed8819e33fa1885c8c199e1c7382080eca1d2ea8fbaaf30d57f0d2e0497a06f4",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/2.0.2/JarvisZero.swift",
+  "sha256": "9a74f7dd6f0da090a53b59173f6dd642bbb23b1d856a9a99f6c241a23f07b7b2",
   "mandatory": false,
   "releaseNotes": [
-    "Enthält den vollständigen Jarvis-2.0-Developer-Workspace und alle Änderungen aus 1.9.6.",
-    "Behebt einen Swift-Concurrency-Kompilierfehler im neuen Claude-Projektarbeitsbereich.",
-    "Claude Code kann weiterhin mehrere Swift-Dateien und Unterordner erstellen und die Grundarchitektur vollständig umbauen.",
-    "Build-, Signatur-, Backup-, Bestätigungs- und Rollback-Schutz bleiben aktiv."
+    "Korrigiert den Claude-Code-Aufruf für die direkte Projektbearbeitung.",
+    "Verwendet den offiziellen --tools-Parameter für Read, Edit, Write, Glob und Grep.",
+    "Claude-Ausgabe und Fehler bleiben nach Entwicklungsversuchen zur Diagnose gespeichert.",
+    "Mehrdateien-Workspace, technische Prüfung, Backup und Installationsbestätigung bleiben erhalten."
   ]
 }
