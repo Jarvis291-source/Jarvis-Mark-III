@@ -1,18 +1,19 @@
 {
   "app": "Jarvis-ZERO",
   "channel": "stable",
-  "currentVersion": "1.5",
-  "latestVersion": "1.6.1",
-  "build": 161,
-  "minimumSupportedVersion": "1.5",
+  "currentVersion": "1.6.1",
+  "latestVersion": "1.7",
+  "build": 170,
+  "minimumSupportedVersion": "1.6.1",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.6.1/JarvisZero.swift",
-  "sha256": "01eae410bce5c36d7855e51c489cfeb9374273bfb3a9b4458c01752d9cff8913",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.7/JarvisZero.swift",
+  "sha256": "15ccad671fc9027a426f49544ebb6e53d2430860a79fd6387aaf7b763c9ab928",
   "mandatory": false,
   "releaseNotes": [
-    "Updater-Fix mit sichtbarem CHECKING-Status und GitHub-API-Fallback.",
-    "Mac-Steuerung aus 1.6 enthalten.",
-    "Automatische Update-Prüfung alle 15 Minuten.",
-    "Desktop-Verknüpfung wird vom neuen Installer angelegt."
+    "MARK IV FUTURE HUD: komplett neue holografische Jarvis-Oberfläche.",
+    "Neuer animierter zentraler Intelligence-Core mit Mehrfachringen und Puls.",
+    "Scanner-Licht, Telemetrie, Command Matrix und Live Data Stream.",
+    "Neues Update-Uplink-Panel und futuristische Command-Eingabe.",
+    "Bestehende Sprach-, Mac-, lokale KI- und Update-Funktionen bleiben erhalten."
   ]
 }
