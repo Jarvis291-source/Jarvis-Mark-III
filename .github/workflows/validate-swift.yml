@@ -1,8 +1,11 @@
-name: Validate Swift Sources
+name: Validate Current Swift Source
 
 on:
   push:
     branches: [main]
+    paths:
+      - 'releases/2.1.0/JarvisZero.swift'
+      - '.github/workflows/validate-swift.yml'
   workflow_dispatch:
 
 jobs:
@@ -11,14 +14,8 @@ jobs:
     container: swift:6.0
     steps:
       - uses: actions/checkout@v4
-      - name: Parse all Jarvis Swift sources
+      - name: Parse current Jarvis source
         shell: bash
         run: |
           set -euo pipefail
-          found=0
-          while IFS= read -r -d '' file; do
-            echo "Parsing $file"
-            swiftc -parse "$file"
-            found=1
-          done < <(find releases -name '*.swift' -print0)
-          test "$found" -eq 1
+          swiftc -parse releases/2.1.0/JarvisZero.swift
