@@ -1,22 +1,22 @@
 {
   "app": "Jarvis-ZERO",
   "channel": "stable",
-  "currentVersion": "2.1.0",
-  "latestVersion": "2.1.2",
-  "build": 212,
+  "currentVersion": "2.1.2",
+  "latestVersion": "2.1.3",
+  "build": 213,
   "minimumSupportedVersion": "1.8.3",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/2.1.2/JarvisZero.swift",
-  "sha256": "e2b6e352b2dc9e9f2239c9ffcf55aa22c8f3e6c3d975f0eb8e8eb03bba977f8c",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/2.1.3/JarvisZero.swift",
+  "sha256": "bb8cac0c118afe02fd17b5f913876a2c363c3d87b44772b67c299e1d2e56939a",
   "mandatory": false,
   "releaseNotes": [
-    "Recovery für den in 2.1.1 beobachteten AVAudioEngine-Laufzeitabsturz.",
-    "Neue Claude-Projekte einer abgestürzten oder abweichenden Version werden nicht erneut als Entwicklungsbasis verwendet.",
-    "Der stabile veröffentlichte Quellstand wird bei Versionsabweichung automatisch neu als Projektbasis angelegt.",
-    "Claude erhält zusätzliche Audio-Laufzeitsicherheitsregeln für AVAudioEngine, installTap und Audioformate.",
-    "Compilerfehler werden weiterhin automatisch an Claude zur Reparatur zurückgegeben.",
-    "Automatische Versionsnummern für erfolgreiche Claude-Entwicklungen bleiben aktiv.",
-    "Nach einer Entwicklerinstallation wird Jarvis jetzt 20 Sekunden überwacht; ein früher Prozessabsturz löst automatisch Rollback aus.",
-    "Jarvis 2.1.2 hat sowohl die Swift-Quellprüfung als auch den vollständigen macOS-Compile-Check bestanden."
+    "Behebt den diagnostizierten Claude-Sprachumbaufehler, bei dem neue Voice-Module und alte Sprachreferenzen unvollständig zusammengeführt wurden.",
+    "Stimmaufträge erhalten einen stabilen Voice-Pfad: AVSpeechSynthesizer wird bevorzugt und die bestehende Spracherkennung bleibt erhalten.",
+    "Keine unnötige AVAudioEngine-Effektkette mehr als Standardweg für reine Stimmänderungen.",
+    "Bis zu sechs Compiler- und Claude-Reparaturzyklen statt drei.",
+    "Abgebrochene Claude-Reparaturstreams erhalten automatisch einen zusätzlichen frischen Reparaturpass.",
+    "Claude läuft für Entwicklungsaufträge im Bare-Modus mit hohem Effort und eingeschränkten Dateiwerkzeugen.",
+    "20-Sekunden-Laufzeitüberwachung und automatisches Rollback bleiben aktiv.",
+    "Jarvis 2.1.3 hat Swift-Quellprüfung und echten macOS-Compile-Check erfolgreich bestanden."
   ]
 }
