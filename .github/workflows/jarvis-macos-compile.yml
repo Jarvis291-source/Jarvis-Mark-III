@@ -17,12 +17,59 @@ jobs:
         uses: actions/checkout@v4
       - name: Swift version
         run: xcrun swiftc --version
-      - name: Compile Jarvis 2.1.6
+      - name: Compile Jarvis 2.1.7
         run: |
-          xcrun swiftc -parse-as-library releases/2.1.6/JarvisZero.swift \
+          xcrun swiftc -parse-as-library releases/2.1.7/JarvisZero.swift \
             -o /tmp/JarvisZero \
             -framework SwiftUI \
             -framework AppKit \
             -framework AVFoundation \
             -framework Speech
           test -x /tmp/JarvisZero
+
+      - name: Multi-file SwiftUI HUD smoke test
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/JarvisHUDSmoke
+          mkdir -p /tmp/JarvisHUDSmoke
+          cat > /tmp/JarvisHUDSmoke/Main.swift <<'SWIFT'
+          import SwiftUI
+          @main struct HUDSmokeApp: App {
+              var body: some Scene {
+                  WindowGroup { HUDSmokeView() }
+              }
+          }
+          SWIFT
+          cat > /tmp/JarvisHUDSmoke/HUD.swift <<'SWIFT'
+          import SwiftUI
+          struct HUDSmokeView: View {
+              var body: some View {
+                  ZStack {
+                      Color.black
+                      TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+                          let t = timeline.date.timeIntervalSinceReferenceDate
+                          Circle()
+                              .stroke(.cyan.opacity(0.8), lineWidth: 2)
+                              .frame(width: 240, height: 240)
+                              .rotationEffect(.degrees(t * 18))
+                      }
+                      HStack {
+                          HUDModule(title: "SYSTEM")
+                          HUDModule(title: "CLAUDE")
+                      }
+                  }
+                  .frame(minWidth: 800, minHeight: 600)
+              }
+          }
+          struct HUDModule: View {
+              let title: String
+              var body: some View {
+                  Text(title)
+                      .padding()
+                      .background(.cyan.opacity(0.08))
+                      .overlay(RoundedRectangle(cornerRadius: 8).stroke(.cyan.opacity(0.4)))
+              }
+          }
+          SWIFT
+          xcrun swiftc -parse-as-library             /tmp/JarvisHUDSmoke/Main.swift             /tmp/JarvisHUDSmoke/HUD.swift             -o /tmp/JarvisHUDSmoke/JarvisHUDSmoke             -framework SwiftUI             -framework AppKit
+          test -x /tmp/JarvisHUDSmoke/JarvisHUDSmoke
