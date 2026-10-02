@@ -1,9 +1,10 @@
 {
   "version": "1.3",
   "build": 130,
-  "status": "bootstrap-pending",
+  "status": "released",
   "installMode": "user-confirmed",
   "sourceFile": "JarvisZero.swift",
-  "sha256": null,
-  "notes": "MARK III 1.3 wird erst freigegeben, wenn die funktionierende MARK-II-Basis übernommen und geprüft wurde."
+  "sourceURL": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.3/JarvisZero.swift",
+  "sha256": "5dcf966f7ca711255a141d9ba1f53c75e1619ebd7879a937ce056bca31095e57",
+  "notes": "Bootstrap-Version fuer den internen Jarvis-Updater. Bestehende MARK-II-Installation bleibt bis zur erfolgreichen Kompilierung unangetastet."
 }
