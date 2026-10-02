@@ -322,6 +322,121 @@ struct LogLine: Identifiable { let id = UUID(); let who:String; let text:String 
         developmentStatus="BEREIT"
         speak("Entwicklermodus beendet.")
     }
+    func processDeveloperInstruction(_ instruction:String) async {
+        let clean=instruction.trimmingCharacters(in:.whitespacesAndNewlines)
+        guard developerMode, !clean.isEmpty else{return}
+        checkClaudeCode()
+        guard claudeCodeAvailable else {
+            developmentStatus="CLAUDE CODE NICHT BEREIT"
+            speak("Claude Code ist nicht erreichbar. Ich habe nichts verändert.")
+            return
+        }
+
+        developerInstruction=clean
+        candidateReady=false
+        awaitingDeveloperInstallConfirmation=false
+        developmentStatus="QUELLCODE LADEN"
+
+        guard let source=await loadDevelopmentSource() else {
+            developmentStatus="QUELLCODEFEHLER"
+            speak("Ich konnte meinen aktuellen Quellcode nicht laden.")
+            return
+        }
+
+        speak("Verstanden. Ich lasse Claude Code die Änderung jetzt entwickeln und prüfe den neuen Build anschließend.")
+        developmentStatus="CLAUDE CODE ENTWICKELT"
+
+        let prompt = """
+        Du arbeitest im ausdrücklich aktivierten Entwicklermodus von Jarvis ZERO.
+        Ändere den vollständigen SwiftUI-macOS-Quellcode exakt nach dem Entwicklungsauftrag.
+
+        ENTWICKLUNGSAUFTRAG:
+        \(clean)
+
+        REGELN:
+        - Gib ausschließlich den vollständigen neuen Swift-Quellcode zurück, ohne Markdown.
+        - Bestehende Kernfunktionen, Gedächtnis, Mac-Steuerung, Internet, Ollama, Claude-Code-Anbindung und Update-System erhalten, außer der Auftrag verlangt ausdrücklich eine Änderung.
+        - Keine Zugangsdaten, Tokens oder Passwörter einbauen.
+        - Keine macOS-Berechtigungen oder Sicherheitsmechanismen umgehen.
+        - Der Code muss mit SwiftUI, AppKit, AVFoundation und Speech kompilierbar bleiben.
+        - Der erzeugte Code darf sich nicht selbst installieren.
+        - Installation erfolgt erst nach ausdrücklicher Bestätigung des Benutzers.
+
+        AKTUELLER QUELLCODE:
+        \(source)
+        """
+
+        guard var candidate=await askClaudeCode(prompt,workingDirectory:developmentDirectory) else {
+            developmentStatus="CLAUDE CODE FEHLER"
+            speak("Claude Code konnte den Entwicklungsauftrag nicht abschließen. Ich habe nichts verändert.")
+            return
+        }
+
+        if candidate.hasPrefix("```") {
+            candidate=candidate
+                .replacingOccurrences(of:"```swift",with:"")
+                .replacingOccurrences(of:"```",with:"")
+                .trimmingCharacters(in:.whitespacesAndNewlines)
+        }
+
+        guard candidate.contains("import SwiftUI"),
+              candidate.contains("@main struct JarvisZeroApp"),
+              candidate.contains("confirmAndInstallUpdate"),
+              candidate.contains("processDeveloperInstruction") else {
+            developmentStatus="KANDIDAT UNGÜLTIG"
+            speak("Der neue Entwurf hat meine Strukturprüfung nicht bestanden und wurde verworfen.")
+            return
+        }
+
+        let candidateFile=developmentDirectory.appendingPathComponent("EntwicklerKandidat.swift")
+        do {
+            try candidate.write(to:candidateFile,atomically:true,encoding:.utf8)
+            let fm=FileManager.default
+            try? fm.removeItem(at:developerCandidateAppURL)
+            let macos=developerCandidateAppURL.appendingPathComponent("Contents/MacOS",isDirectory:true)
+            try fm.createDirectory(at:macos,withIntermediateDirectories:true)
+            let plist=developerCandidateAppURL.appendingPathComponent("Contents/Info.plist")
+            try fm.copyItem(at:Bundle.main.bundleURL.appendingPathComponent("Contents/Info.plist"),to:plist)
+
+            developmentStatus="KOMPILIERPRÜFUNG"
+            let binary=macos.appendingPathComponent("JarvisZero")
+            let compile=runProcess("/usr/bin/xcrun",[
+                "swiftc","-parse-as-library",candidateFile.path,
+                "-o",binary.path,
+                "-framework","SwiftUI",
+                "-framework","AppKit",
+                "-framework","AVFoundation",
+                "-framework","Speech"
+            ])
+            guard compile == 0, fm.fileExists(atPath:binary.path) else {
+                candidateReady=false
+                developmentStatus="KANDIDAT VERWORFEN"
+                speak("Der neue Code hat die Kompilierprüfung nicht bestanden. Die laufende Version bleibt unverändert.")
+                return
+            }
+
+            _=runProcess("/bin/chmod",["+x",binary.path])
+            developmentStatus="SIGNIERPRÜFUNG"
+            let sign=runProcess("/usr/bin/codesign",["--force","--deep","--sign","-",developerCandidateAppURL.path])
+            guard sign == 0,
+                  runProcess("/usr/bin/codesign",["--verify","--deep","--strict",developerCandidateAppURL.path]) == 0 else {
+                candidateReady=false
+                developmentStatus="SIGNIERPRÜFUNG FEHLER"
+                speak("Der neue Build hat die Signierprüfung nicht bestanden und wurde verworfen.")
+                return
+            }
+
+            try candidate.write(to:activeSourceURL,atomically:true,encoding:.utf8)
+            candidateReady=true
+            awaitingDeveloperInstallConfirmation=true
+            developmentStatus="ENTWICKLUNG BEREIT"
+            speak("Die neue Entwicklung ist fertig und geprüft. Soll ich sie jetzt installieren?")
+        } catch {
+            candidateReady=false
+            developmentStatus="ENTWICKLUNGSFEHLER"
+            speak("Beim Aufbau des neuen Jarvis ist ein Fehler aufgetreten. Die bisherige Version bleibt erhalten.")
+        }
+    }
     func runSelfDevelopmentCycle() async {
         guard localAI else {
             developmentStatus = "KI NICHT BEREIT"
