@@ -1,18 +1,19 @@
 {
   "app": "Jarvis-ZERO",
   "channel": "stable",
-  "currentVersion": "1.4",
-  "latestVersion": "1.5",
-  "build": 150,
-  "minimumSupportedVersion": "1.4",
+  "currentVersion": "1.5",
+  "latestVersion": "1.6",
+  "build": 160,
+  "minimumSupportedVersion": "1.5",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.5/JarvisZero.swift",
-  "sha256": "cf3da2e46b3c15ae982d325e69120e0a3e7035f64ae004a8e4f8319a4298b47f",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.6/JarvisZero.swift",
+  "sha256": "567ff8ed6cf326ee6ee8731e2447fd2aaa412ca7b2cc6e78518214ec696e4863",
   "mandatory": false,
   "releaseNotes": [
-    "Live-Update-Test auf MARK III 1.5.",
-    "Sichtbarer Hinweis GITHUB CHANNEL • LIVE.",
-    "Build-Anzeige auf 1.5 aktualisiert.",
-    "Update weiterhin nur nach Bestätigung mit SHA-256-Prüfung und Backup."
+    "MARK III 1.6: Ausbau der Mac-Steuerung.",
+    "Lokale KI erkennt installierte Ollama-Modelle automatisch.",
+    "Neue Befehle: Systemeinstellungen, Rechner, Screenshot, Lautstärke, Stumm/Unmute und Update-Prüfung.",
+    "Update-Prüfung jetzt alle 15 Minuten.",
+    "Sichtbare Anzeige des aktiven lokalen KI-Modells."
   ]
 }
