@@ -1,0 +1,12 @@
+{
+  "version": "1.8",
+  "build": 180,
+  "status": "released",
+  "installMode": "user-confirmed",
+  "sourceURL": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/1.8/JarvisZero.swift",
+  "sha256": "52d2d7b33d19475489d89a29401f7d97ff0555ee81783e5232e060bf54cdbd7c",
+  "theme": "MARK V Reactive Holographic HUD",
+  "voice": "German de-DE, male enhanced preferred, system fallback",
+  "restartRequired": true,
+  "rollback": true
+}
