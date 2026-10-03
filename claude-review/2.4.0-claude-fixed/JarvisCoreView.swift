@@ -4,7 +4,7 @@ struct JarvisCoreView: View {
     var state: JarvisSystemState
     
     var body: some View {
-        TimelineView<TimelineView.AnimationSchedule>(.animation) { timeline in
+        TimelineView<AnimationSchedule>(.animation) { timeline in
             Canvas { context, size in
                 let center = CGPoint(x: size.width / 2, y: size.height / 2)
                 let time = timeline.date.timeIntervalSinceReferenceDate
@@ -93,7 +93,7 @@ struct JarvisCoreView: View {
                 if case .error = state {
                     // Glitch effect
                     let glitchOffset = CGFloat.random(in: -5...5)
-                    context.fill(Path(rect: CGRect(x: center.x + glitchOffset, y: center.y - 50, width: 100, height: 1)), with: .color(.orange.opacity(0.5)))
+                    context.fill(Path(CGRect(x: center.x + glitchOffset, y: center.y - 50, width: 100, height: 1)), with: .color(.orange.opacity(0.5)))
                 }
             }
         }
