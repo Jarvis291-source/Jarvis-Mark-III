@@ -43,7 +43,7 @@ struct JarvisCoreView: View {
                     let ringAngle = time * ringSpeed
                     
                     for i in 0..<12 {
-                        let angle = ringAngle + (CGFloat(i) * CGFloat.pi * 2 / 12)
+                        let angle = ringAngle + (CGFloat(i) * CGFloat.pi * 2.0 / 12.0)
                         let px = center.x + cos(angle) * ringRadius
                         let py = center.y + sin(angle) * ringRadius
                         
