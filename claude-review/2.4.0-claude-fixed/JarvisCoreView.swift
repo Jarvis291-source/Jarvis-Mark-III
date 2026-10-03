@@ -85,7 +85,7 @@ struct JarvisCoreView: View {
                 
                 // LAYER 5: State-specific overlays
                 if case .updating(let progress) = state {
-                    let progressPath = Path()
+                    var progressPath = Path()
                     progressPath.addArc(center: center, radius: 140, startAngle: .degrees(0), endAngle: .degrees(progress * 360), clockwise: false)
                     context.stroke(progressPath, with: .color(.cyan), lineWidth: 3)
                 }
