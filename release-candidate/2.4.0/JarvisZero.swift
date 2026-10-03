@@ -319,10 +319,11 @@ struct LogLine: Identifiable { let id = UUID(); let who:String; let text:String 
         try fm.createDirectory(at:coreDir,withIntermediateDirectories:true)
         try fm.createDirectory(at:uiDir,withIntermediateDirectories:true)
 
-        // Ab 2.4.0 wird der stabile Monolith VOR Claude in Kern und UI getrennt.
-        // Dadurch muss Claude bei großen Designaufträgen nicht mehr die gesamte Jarvis-Datei umstrukturieren.
-        let splitMarker="\n\nstruct ArcRing: View {"
-        if let markerRange=source.range(of:splitMarker) {
+        // Der stabile Monolith wird VOR Claude in Kern und UI getrennt.
+        // 2.4.0 nutzt den neuen Komponentenmarker; der 2.3.x-Marker bleibt als Rückwärtskompatibilität erhalten.
+        let splitMarkerV24="\n\n// ===== JarvisVisualState.swift ====="
+        let splitMarkerLegacy="\n\nstruct ArcRing: View {"
+        if let markerRange=source.range(of:splitMarkerV24) ?? source.range(of:splitMarkerLegacy) {
             let coreSource=String(source[..<markerRange.lowerBound]).trimmingCharacters(in:.whitespacesAndNewlines)+"\n"
             let uiBody=String(source[markerRange.lowerBound...]).trimmingCharacters(in:.whitespacesAndNewlines)
             let uiSource="""
