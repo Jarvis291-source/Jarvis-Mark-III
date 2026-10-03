@@ -1,10 +1,10 @@
-name: Claude Original UI Compile Review
+name: Claude Fixed UI Compile Review
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - 'claude-review/2.4.0-original/**'
+      - 'claude-review/2.4.0-claude-fixed/**'
       - '.github/workflows/claude-original-review.yml'
 
 jobs:
@@ -12,30 +12,30 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - run: xcrun swiftc -typecheck claude-review/2.4.0-original/JarvisVisualState.swift claude-review/2.4.0-original/JarvisVoiceController.swift -framework SwiftUI -framework AVFoundation
+      - run: xcrun swiftc -typecheck claude-review/2.4.0-claude-fixed/JarvisVisualState.swift claude-review/2.4.0-claude-fixed/JarvisVoiceController.swift -framework SwiftUI -framework AVFoundation
   background:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - run: xcrun swiftc -typecheck claude-review/2.4.0-original/JarvisVisualState.swift claude-review/2.4.0-original/JarvisBackgroundView.swift -framework SwiftUI
+      - run: xcrun swiftc -typecheck claude-review/2.4.0-claude-fixed/JarvisVisualState.swift claude-review/2.4.0-claude-fixed/JarvisBackgroundView.swift -framework SwiftUI
   core:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - run: xcrun swiftc -typecheck claude-review/2.4.0-original/JarvisVisualState.swift claude-review/2.4.0-original/JarvisCoreView.swift -framework SwiftUI
+      - run: xcrun swiftc -typecheck claude-review/2.4.0-claude-fixed/JarvisVisualState.swift claude-review/2.4.0-claude-fixed/JarvisCoreView.swift -framework SwiftUI
   module:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - run: xcrun swiftc -typecheck claude-review/2.4.0-original/JarvisVisualState.swift claude-review/2.4.0-original/JarvisModuleView.swift -framework SwiftUI
+      - run: xcrun swiftc -typecheck claude-review/2.4.0-claude-fixed/JarvisVisualState.swift claude-review/2.4.0-claude-fixed/JarvisModuleView.swift -framework SwiftUI
   workspace:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - run: xcrun swiftc -typecheck claude-review/2.4.0-original/JarvisVisualState.swift claude-review/2.4.0-original/JarvisWorkspaceView.swift -framework SwiftUI
-  all-original:
+      - run: xcrun swiftc -typecheck claude-review/2.4.0-claude-fixed/JarvisVisualState.swift claude-review/2.4.0-claude-fixed/JarvisWorkspaceView.swift -framework SwiftUI
+  all-claude-fixed:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - run: |
-          xcrun swiftc -typecheck claude-review/2.4.0-original/*.swift -framework SwiftUI -framework AppKit -framework AVFoundation
+          xcrun swiftc -typecheck claude-review/2.4.0-claude-fixed/*.swift -framework SwiftUI -framework AppKit -framework AVFoundation
