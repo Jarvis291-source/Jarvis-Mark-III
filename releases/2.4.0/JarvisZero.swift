@@ -1,0 +1,2918 @@
+// ===== JarvisBackend.swift =====
+import SwiftUI
+import AppKit
+import AVFoundation
+import Speech
+
+struct JarvisUpdateManifest: Codable {
+    let app: String
+    let channel: String
+    let latestVersion: String
+    let build: Int
+    let minimumSupportedVersion: String
+    let package: String?
+    let sha256: String?
+    let mandatory: Bool
+    let releaseNotes: [String]
+}
+
+struct JarvisMemoryEntry: Codable, Identifiable {
+    let id: UUID
+    let text: String
+    let createdAt: Date
+}
+
+enum JarvisRoute: String {
+    case mac = "MAC"
+    case memory = "GEDÄCHTNIS"
+    case weather = "WETTER"
+    case news = "NACHRICHTEN"
+    case web = "INTERNET"
+    case localAI = "LOKALE KI"
+}
+
+@main struct JarvisZeroApp: App {
+    var body: some Scene {
+        WindowGroup { JarvisView().frame(minWidth: 1280, minHeight: 820) }
+            .windowStyle(.hiddenTitleBar)
+    }
+}
+
+struct LogLine: Identifiable { let id = UUID(); let who:String; let text:String }
+
+@MainActor final class JarvisCore: NSObject, ObservableObject, SFSpeechRecognizerDelegate, AVSpeechSynthesizerDelegate {
+    @Published var status = "BEREIT"
+    @Published var transcript = ""
+    @Published var logs:[LogLine] = [LogLine(who:"JARVIS", text:"System online. Bereit, Jonas.")]
+    @Published var listening = false
+    @Published var continuous = true
+    @Published var speaking = false
+    @Published var voiceLabel = "DEUTSCHE STIMME"
+    @Published var localAI = false
+    @Published var localAIModel = "NICHT VERBUNDEN"
+    @Published var aiSetupStatus = "PRÜFUNG AUSSTEHEND"
+    @Published var aiInstalling = false
+    @Published var memoryCount = 0
+    @Published var developmentStatus = "BEREIT"
+    @Published var candidateReady = false
+    @Published var developerMode = false
+    @Published var awaitingDeveloperInstallConfirmation = false
+    @Published var developerInstruction = ""
+    @Published var developmentProgress:Double = 0.0
+    @Published var developmentProgressText = "BEREIT"
+    @Published var internetStatus = "BEREIT"
+    @Published var claudeCodeStatus = "PRÜFUNG AUSSTEHEND"
+    @Published var claudeCodeAvailable = false
+    @Published var lastRoute = "LOKAL"
+    @Published var defaultLocation = UserDefaults.standard.string(forKey:"JarvisDefaultLocation") ?? ""
+    @Published var cpuPulse:Double = 0.22
+    @Published var updateAvailable = false
+    @Published var latestVersion = "2.4.0"
+    @Published var updateStatus = "AKTUELL"
+    @Published var updateNotes:[String] = []
+    private var pendingPackageURL:String?
+    private var pendingSHA256:String?
+    private static var currentVersion: String {
+        Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "2.4.0"
+    }
+    private static let manifestURL = "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/manifest.json"
+    private let synth = AVSpeechSynthesizer()
+    private let engine = AVAudioEngine()
+    private let recognizer = SFSpeechRecognizer(locale: Locale(identifier:"de-DE"))
+    private var request:SFSpeechAudioBufferRecognitionRequest?
+    private var task:SFSpeechRecognitionTask?
+    private var lastHandled = ""
+    private var restartWork: Task<Void,Never>?
+    private var updateLoop: Task<Void,Never>?
+    private var developmentLoop: Task<Void,Never>?
+    private var recentContext:[String] = []
+    private var memory:[JarvisMemoryEntry] = []
+    private static let selfSourceURL = "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/2.4.0/JarvisZero.swift"
+
+    override init(){ super.init(); recognizer?.delegate = self; synth.delegate = self }
+    func boot() async {
+        loadMemory()
+        await requestPermissions()
+        await checkLocalAI()
+        checkClaudeCode()
+        await checkForUpdates()
+        startAutomaticUpdateChecks()
+        startDevelopmentLoop()
+        if continuous { startListening() }
+    }
+    func startAutomaticUpdateChecks() {
+        updateLoop?.cancel()
+        updateLoop = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 900_000_000_000)
+                if Task.isCancelled { break }
+                await self.checkForUpdates()
+            }
+        }
+    }
+    func requestPermissions() async {
+        _ = await withCheckedContinuation { c in SFSpeechRecognizer.requestAuthorization { _ in c.resume(returning: ()) } }
+        _ = await AVCaptureDevice.requestAccess(for: .audio)
+    }
+    func speak(_ text:String){
+        logs.append(LogLine(who:"JARVIS",text:text))
+        let resume = continuous
+
+        if engine.isRunning { stopListening() }
+        synth.stopSpeaking(at:.immediate)
+
+        let utterance = AVSpeechUtterance(string:text)
+        let voices = AVSpeechSynthesisVoice.speechVoices()
+
+        let germanMalePremium = voices.first {
+            $0.language == "de-DE" && $0.gender == .male && $0.quality == .premium
+        }
+        let germanPremium = voices.first {
+            $0.language == "de-DE" && $0.quality == .premium
+        }
+        let germanMaleEnhanced = voices.first {
+            $0.language == "de-DE" && $0.gender == .male && $0.quality == .enhanced
+        }
+        let germanEnhanced = voices.first {
+            $0.language == "de-DE" && $0.quality == .enhanced
+        }
+        let germanMale = voices.first {
+            $0.language == "de-DE" && $0.gender == .male
+        }
+        let chosen = germanMalePremium
+            ?? germanPremium
+            ?? germanMaleEnhanced
+            ?? germanEnhanced
+            ?? germanMale
+            ?? AVSpeechSynthesisVoice(language:"de-DE")
+
+        utterance.voice = chosen
+        utterance.rate = 0.50
+        utterance.pitchMultiplier = 0.97
+        utterance.volume = 1.0
+        utterance.preUtteranceDelay = 0.01
+        utterance.postUtteranceDelay = 0.02
+
+        voiceLabel = chosen?.name.uppercased() ?? "DE SYSTEM"
+        shouldResumeAfterSpeech = resume
+        speaking = true
+        status = "SPRICHT"
+        synth.speak(utterance)
+    }
+
+    private var shouldResumeAfterSpeech = false
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didStart utterance: AVSpeechUtterance) {
+        Task { @MainActor in
+            self.speaking = true
+            self.status = "SPRICHT"
+        }
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        Task { @MainActor in
+            self.speaking = false
+            if self.shouldResumeAfterSpeech && self.continuous {
+                self.shouldResumeAfterSpeech = false
+                try? await Task.sleep(nanoseconds: 180_000_000)
+                self.startListening()
+            } else {
+                self.status = self.listening ? "HÖRT ZU" : "BEREIT"
+            }
+        }
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        Task { @MainActor in
+            self.speaking = false
+            if self.continuous && !self.listening {
+                try? await Task.sleep(nanoseconds: 150_000_000)
+                self.startListening()
+            }
+        }
+    }
+
+
+    private var supportDirectory: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = base.appendingPathComponent("Jarvis-ZERO", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    private var memoryURL: URL { supportDirectory.appendingPathComponent("memory.json") }
+    private var developmentDirectory: URL {
+        let dir = supportDirectory.appendingPathComponent("Entwicklung", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    func loadMemory() {
+        guard let data = try? Data(contentsOf: memoryURL),
+              let decoded = try? JSONDecoder().decode([JarvisMemoryEntry].self, from: data) else {
+            memory = []
+            memoryCount = 0
+            return
+        }
+        memory = decoded
+        memoryCount = memory.count
+    }
+
+    private func saveMemory() {
+        guard let data = try? JSONEncoder().encode(memory) else { return }
+        try? data.write(to: memoryURL, options: .atomic)
+        memoryCount = memory.count
+    }
+
+    func remember(_ text:String) {
+        let clean = text.trimmingCharacters(in:.whitespacesAndNewlines)
+        guard clean.count > 1 else { return }
+        if !memory.contains(where: { $0.text.caseInsensitiveCompare(clean) == .orderedSame }) {
+            memory.append(JarvisMemoryEntry(id:UUID(), text:clean, createdAt:Date()))
+            if memory.count > 250 { memory.removeFirst(memory.count - 250) }
+            saveMemory()
+        }
+    }
+
+    private func memoryContext() -> String {
+        memory.suffix(30).map { "- \($0.text)" }.joined(separator:"\n")
+    }
+
+    private func addContext(_ role:String,_ text:String) {
+        let clean=text.trimmingCharacters(in:.whitespacesAndNewlines)
+        guard !clean.isEmpty else{return}
+        recentContext.append("\(role): \(clean)")
+        if recentContext.count > 16 { recentContext.removeFirst(recentContext.count - 16) }
+    }
+
+    func startDevelopmentLoop() {
+        developmentLoop?.cancel()
+        developmentLoop = Task {
+            try? await Task.sleep(nanoseconds: 21_600_000_000_000)
+            while !Task.isCancelled {
+                if self.localAI && !self.speaking && !self.listening {
+                    await self.analyzeDevelopmentIdea()
+                }
+                try? await Task.sleep(nanoseconds: 43_200_000_000_000)
+            }
+        }
+    }
+
+    func analyzeDevelopmentIdea() async {
+        guard localAI else {
+            developmentStatus = "KI NICHT BEREIT"
+            return
+        }
+        developmentStatus = "ANALYSE"
+        let recent = logs.suffix(20).map { "\($0.who): \($0.text)" }.joined(separator:"\n")
+        let prompt = """
+        Analysiere Jarvis als lokalen macOS-Assistenten. Finde genau eine kleine, realistische Verbesserung,
+        die Zuverlässigkeit, Bedienung, Sprachsteuerung oder Automatisierung verbessert.
+        Antworte ausschließlich auf Deutsch und sehr konkret. Kein Marketing.
+        Letzte Nutzung:
+        \(recent)
+        """
+        if let idea = await askOllamaRaw(prompt) {
+            let stamp = ISO8601DateFormatter().string(from:Date()).replacingOccurrences(of:":",with:"-")
+            let file = developmentDirectory.appendingPathComponent("Idee-\(stamp).txt")
+            try? idea.write(to:file, atomically:true, encoding:.utf8)
+            developmentStatus = "NEUE IDEE GESPEICHERT"
+        } else {
+            developmentStatus = "ANALYSEFEHLER"
+        }
+    }
+
+    private var activeSourceURL: URL {
+        developmentDirectory.appendingPathComponent("AktiverQuellcode.swift")
+    }
+
+    private var activeProjectDirectory: URL {
+        developmentDirectory.appendingPathComponent("AktivesProjekt", isDirectory:true)
+    }
+
+    private var claudeProjectWorkspace: URL {
+        developmentDirectory.appendingPathComponent("Claude-Projekt", isDirectory:true)
+    }
+
+    private func swiftFiles(in root:URL) -> [URL] {
+        guard let e=FileManager.default.enumerator(at:root,includingPropertiesForKeys:nil) else{return []}
+        var out:[URL]=[]
+        for case let u as URL in e {
+            if u.pathExtension.lowercased()=="swift" { out.append(u) }
+        }
+        return out.sorted { $0.path < $1.path }
+    }
+
+    private func seedDeveloperProject(from source:String) throws {
+        let fm=FileManager.default
+        let versionFile=activeProjectDirectory.appendingPathComponent("JARVIS_VERSION.txt")
+        let projectVersion=(try? String(contentsOf:versionFile,encoding:.utf8))?.trimmingCharacters(in:.whitespacesAndNewlines)
+        if fm.fileExists(atPath:activeProjectDirectory.path),
+           !swiftFiles(in:activeProjectDirectory).isEmpty,
+           projectVersion == Self.currentVersion { return }
+
+        // Ein Projekt einer abgestürzten/älteren Claude-Version niemals erneut als Basis verwenden.
+        try? fm.removeItem(at:activeProjectDirectory)
+        let sources=activeProjectDirectory.appendingPathComponent("Sources",isDirectory:true)
+        let coreDir=sources.appendingPathComponent("Core",isDirectory:true)
+        let uiDir=sources.appendingPathComponent("UI",isDirectory:true)
+        try fm.createDirectory(at:coreDir,withIntermediateDirectories:true)
+        try fm.createDirectory(at:uiDir,withIntermediateDirectories:true)
+
+        // Der stabile Monolith wird VOR Claude in Kern und UI getrennt.
+        // 2.4.0 nutzt den neuen Komponentenmarker; der 2.3.x-Marker bleibt als Rückwärtskompatibilität erhalten.
+        let splitMarkerV24="\n\n// ===== JarvisVisualState.swift ====="
+        let splitMarkerLegacy="\n\nstruct ArcRing: View {"
+        if let markerRange=source.range(of:splitMarkerV24) ?? source.range(of:splitMarkerLegacy) {
+            let coreSource=String(source[..<markerRange.lowerBound]).trimmingCharacters(in:.whitespacesAndNewlines)+"\n"
+            let uiBody=String(source[markerRange.lowerBound...]).trimmingCharacters(in:.whitespacesAndNewlines)
+            let uiSource="""
+            import SwiftUI
+            import AppKit
+            import Foundation
+            import Combine
+
+            \(uiBody)
+            """
+            try coreSource.write(to:coreDir.appendingPathComponent("JarvisCore.swift"),atomically:true,encoding:.utf8)
+            try uiSource.write(to:uiDir.appendingPathComponent("JarvisHUD.swift"),atomically:true,encoding:.utf8)
+        } else {
+            // Sicherer Fallback, falls sich die Quellstruktur später ändert.
+            try source.write(to:coreDir.appendingPathComponent("JarvisZero.swift"),atomically:true,encoding:.utf8)
+        }
+
+        let guide="""
+        # JARVIS Entwicklerprojekt
+
+        ## Architektur
+        - Sources/Core enthält die stabile Kernlogik: Sprache, Routing, Claude Code, Ollama, Gedächtnis, Updates, Installation und Rollback.
+        - Sources/UI/JarvisHUD.swift enthält die SwiftUI-Oberfläche und ist bei Designaufträgen der primäre Arbeitsbereich.
+        - Alle Swift-Dateien unter Sources werden vom Host gemeinsam kompiliert.
+
+        ## Regeln für Designaufträge
+        1. Lies zuerst Sources/UI/JarvisHUD.swift vollständig.
+        2. Ändere bei einem Designauftrag die UI tatsächlich und substanziell.
+        3. Reine Text-, Überschrift- oder Farbänderungen gelten nicht als fertiger Designauftrag.
+        4. Kernlogik in Sources/Core nur ändern, wenn die gewünschte UI-Funktion es zwingend benötigt.
+        5. Du darfst zusätzliche SwiftUI-Dateien unter Sources/UI anlegen.
+        6. Keine externen Pakete oder Abhängigkeiten hinzufügen.
+        7. Keine vorhandenen Funktionen für Sprache, Claude, Updates, lokale KI, Gedächtnis, Installation oder Rollback entfernen.
+        """
+        try guide.write(to:activeProjectDirectory.appendingPathComponent("CLAUDE.md"),atomically:true,encoding:.utf8)
+        try Self.currentVersion.write(to:versionFile,atomically:true,encoding:.utf8)
+    }
+
+    private func cloneDirectory(from src:URL,to dst:URL) throws {
+        let fm=FileManager.default
+        try? fm.removeItem(at:dst)
+        try fm.copyItem(at:src,to:dst)
+    }
+
+    private var developerCandidateAppURL: URL {
+        developmentDirectory.appendingPathComponent("Jarvis-Entwicklungskandidat.app", isDirectory:true)
+    }
+
+    private func loadDevelopmentSource() async -> String? {
+        let versionFile=activeProjectDirectory.appendingPathComponent("JARVIS_VERSION.txt")
+        let projectVersion=(try? String(contentsOf:versionFile,encoding:.utf8))?.trimmingCharacters(in:.whitespacesAndNewlines)
+        if projectVersion == Self.currentVersion,
+           let first=swiftFiles(in:activeProjectDirectory).first,
+           let local=try? String(contentsOf:first,encoding:.utf8),
+           !local.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty {
+            return local
+        }
+
+        // Bei Versionsabweichung bewusst den veröffentlichten stabilen Quellstand laden.
+        guard let url=URL(string:Self.selfSourceURL) else{return nil}
+        do {
+            var req=URLRequest(url:url)
+            req.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+            req.timeoutInterval = 30
+            let (data,response)=try await URLSession.shared.data(for:req)
+            guard (response as? HTTPURLResponse)?.statusCode == 200,
+                  let source=String(data:data,encoding:.utf8) else{return nil}
+            try? source.write(to:activeSourceURL,atomically:true,encoding:.utf8)
+            return source
+        } catch { return nil }
+    }
+
+    func enterDeveloperMode() {
+        checkClaudeCode()
+        guard claudeCodeAvailable else {
+            developerMode=false
+            developmentStatus="CLAUDE CODE NICHT BEREIT"
+            speak("Der Entwicklermodus braucht eine aktive Claude Code Anmeldung. Claude Code ist entweder nicht erreichbar oder nicht angemeldet.")
+            return
+        }
+        developerMode=true
+        awaitingDeveloperInstallConfirmation=false
+        developmentProgress=0.0
+        developmentProgressText="BEREIT"
+        developmentStatus="ENTWICKLERMODUS AKTIV"
+        speak("Entwicklermodus aktiviert. Sag mir jetzt, was ich an mir verändern soll.")
+    }
+
+    func leaveDeveloperMode() {
+        developerMode=false
+        awaitingDeveloperInstallConfirmation=false
+        developerInstruction=""
+        developmentStatus="BEREIT"
+        speak("Entwicklermodus beendet.")
+    }
+    private func projectFingerprint(_ root:URL) -> String {
+        swiftFiles(in:root).map { file in
+            let relative=file.path.replacingOccurrences(of:root.path,with:"")
+            let data=(try? Data(contentsOf:file)) ?? Data()
+            return "\(relative)|\(data.count)|\(data.hashValue)"
+        }.joined(separator:"\n")
+    }
+
+    private func uiProjectFingerprint(_ root:URL) -> String {
+        swiftFiles(in:root)
+            .filter { $0.path.contains("/Sources/UI/") }
+            .map { file in
+                let relative=file.path.replacingOccurrences(of:root.path,with:"")
+                let data=(try? Data(contentsOf:file)) ?? Data()
+                return "\(relative)|\(data.count)|\(data.hashValue)"
+            }
+            .joined(separator:"\n")
+    }
+
+    private func nextDeveloperVersion() -> String {
+        let current=Self.currentVersion
+        var parts=current.split(separator:".").map { Int($0) ?? 0 }
+        while parts.count < 3 { parts.append(0) }
+        if parts.count > 3 { parts=Array(parts.prefix(3)) }
+        parts[2] += 1
+        return parts.map(String.init).joined(separator:".")
+    }
+
+    private func writeCandidateInfoPlist(version:String,to destination:URL) throws {
+        let source=Bundle.main.bundleURL.appendingPathComponent("Contents/Info.plist")
+        let data=try Data(contentsOf:source)
+        guard var plist=try PropertyListSerialization.propertyList(from:data,options:[],format:nil) as? [String:Any] else {
+            throw NSError(domain:"JarvisDeveloper",code:41)
+        }
+        plist["CFBundleShortVersionString"]=version
+        plist["CFBundleVersion"]=String(Int(Date().timeIntervalSince1970))
+        let output=try PropertyListSerialization.data(fromPropertyList:plist,format:.xml,options:0)
+        try output.write(to:destination,options:.atomic)
+    }
+
+    private func runProcessCaptured(_ executable:String,_ args:[String],logURL:URL) -> (Int32,String) {
+        let fm=FileManager.default
+        try? fm.removeItem(at:logURL)
+        fm.createFile(atPath:logURL.path,contents:nil)
+        guard let handle=try? FileHandle(forWritingTo:logURL) else { return (-1,"Protokolldatei konnte nicht geöffnet werden.") }
+        defer { try? handle.close() }
+        let p=Process()
+        p.executableURL=URL(fileURLWithPath:executable)
+        p.arguments=args
+        p.standardOutput=handle
+        p.standardError=handle
+        do {
+            try p.run()
+            p.waitUntilExit()
+            try? handle.synchronize()
+            let text=(try? String(contentsOf:logURL,encoding:.utf8)) ?? ""
+            return (p.terminationStatus,text)
+        } catch {
+            return (-1,error.localizedDescription)
+        }
+    }
+
+    private func runClaudePass(prompt:String,workspace:URL,label:String,timeout:TimeInterval=1200) async -> Int32 {
+        guard let claude=findClaudeBinary() else {
+            claudeCodeAvailable=false
+            claudeCodeStatus="NICHT GEFUNDEN"
+            return -1
+        }
+
+        let fm=FileManager.default
+        let outURL=developmentDirectory.appendingPathComponent("Letzter-Claude-Bericht.txt")
+        let errURL=developmentDirectory.appendingPathComponent("Letzter-Claude-Fehler.txt")
+        try? fm.removeItem(at:outURL)
+        try? fm.removeItem(at:errURL)
+        fm.createFile(atPath:outURL.path,contents:nil)
+        fm.createFile(atPath:errURL.path,contents:nil)
+        guard let outHandle=try? FileHandle(forWritingTo:outURL),
+              let errHandle=try? FileHandle(forWritingTo:errURL) else { return -1 }
+
+        claudeCodeStatus=label
+        let status:Int32 = await Task.detached(priority:.userInitiated) {
+            defer {
+                try? outHandle.close()
+                try? errHandle.close()
+            }
+            let p=Process()
+            p.executableURL=URL(fileURLWithPath:claude)
+            p.currentDirectoryURL=workspace
+            p.arguments=[
+                "-p",prompt,
+                "--effort","high",
+                "--permission-mode","acceptEdits",
+                "--tools","Read,Edit,Write,Glob,Grep",
+                "--verbose"
+            ]
+            var env=ProcessInfo.processInfo.environment
+            env["HOME"]=FileManager.default.homeDirectoryForCurrentUser.path
+            let localBin=FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin").path
+            env["PATH"]="\(localBin):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+            p.environment=env
+            p.standardOutput=outHandle
+            p.standardError=errHandle
+            do {
+                try p.run()
+                let started=Date()
+                while p.isRunning && Date().timeIntervalSince(started) < timeout {
+                    Thread.sleep(forTimeInterval:0.25)
+                }
+                if p.isRunning {
+                    p.interrupt()
+                    Thread.sleep(forTimeInterval:1.0)
+                    if p.isRunning { p.terminate() }
+                }
+                p.waitUntilExit()
+                return p.terminationStatus
+            } catch {
+                return -1
+            }
+        }.value
+        return status
+    }
+
+    private func runClaudeWorkspaceEdit(instruction:String, source:String) async -> URL? {
+        guard findClaudeBinary() != nil else {
+            claudeCodeAvailable=false
+            claudeCodeStatus="NICHT GEFUNDEN"
+            return nil
+        }
+
+        let fm=FileManager.default
+        do {
+            try seedDeveloperProject(from:source)
+            try cloneDirectory(from:activeProjectDirectory,to:claudeProjectWorkspace)
+            let original=projectFingerprint(claudeProjectWorkspace)
+            let originalUI=uiProjectFingerprint(claudeProjectWorkspace)
+
+            let lowerInstruction=instruction.lowercased()
+            let voiceFocused = lowerInstruction.contains("stimm") || lowerInstruction.contains("voice") || lowerInstruction.contains("jarvis aus") || lowerInstruction.contains("iron man")
+            let designFocused = lowerInstruction.contains("design") || lowerInstruction.contains("benutzeroberfläche") || lowerInstruction.contains("oberfläche") || lowerInstruction.contains("swiftui") || lowerInstruction.contains("hud") || lowerInstruction.contains("partikel") || lowerInstruction.contains("kugel") || lowerInstruction.contains("core")
+            let designRules = designFocused ? """
+            
+            BESONDERE REGELN FÜR EINEN GROSSEN UI-/DESIGNAUFTRAG:
+            - Behandle den Auftrag als echten SwiftUI-Umbau, nicht als Textänderung oder Beschreibung.
+            - Beginne in Sources/UI/JarvisHUD.swift. Diese Datei ist absichtlich vom stabilen JarvisCore getrennt und ist dein primärer Arbeitsbereich.
+            - Lies JarvisView, CoreOrb, HUDPanel und die zugehörigen UI-Helfer vollständig, bevor du das Design umbaust.
+            - Die funktionierende JarvisCore-Logik für Sprache, Claude Code, Updates, lokale KI, Gedächtnis und Installation muss erhalten bleiben.
+            - Du darfst die UI in mehrere Swift-Dateien unter Sources/UI aufteilen. Wenn du Typen verschiebst, entferne die alten Definitionen vollständig, damit keine doppelten Symbole entstehen.
+            - Mindestens JarvisView oder die von JarvisView verwendeten UI-Komponenten müssen sich bei einem Designauftrag substanziell ändern. Eine reine Überschrift-, Farb- oder Textänderung reicht nicht.
+            - Für Animationen bevorzugst du SwiftUI TimelineView, Canvas, Shape und leichte GPU-freundliche Effekte. Keine externe Bibliothek und kein Metal-Paket hinzufügen.
+            - Alle Bedienelemente für Entwicklermodus, Update, Texteingabe und vorhandene Statusinformationen müssen weiterhin erreichbar bleiben.
+            - Keine erfolgreiche Smartphone-Kopplung vortäuschen. Eine Pairing-Ansicht darf als UI vorbereitet werden, echte Autorisierung erst mit echter Gegenstelle.
+            - Ziel ist ein kompilierbarer macOS-SwiftUI-Projektstand, nicht ein Mockup und nicht nur eine Erklärung.
+            """ : ""
+
+            let voiceRules = voiceFocused ? """
+            
+            BESONDERE REGELN FÜR DIESEN STIMMAUFTRAG:
+            - Der Auftrag betrifft primär die AUSGABESTIMME. Verändere nicht unnötig die bestehende Mikrofon- und SFSpeechRecognition-Architektur.
+            - Bevorzuge für die Sprachausgabe AVSpeechSynthesizer, eine passende installierte männliche Stimme sowie rate, pitchMultiplier, volume und saubere Sprechpausen.
+            - Erzeuge eine eigenständige, tiefe, ruhige, elegante, futuristische KI-Stimme; keine exakte Imitation einer realen Schauspielerstimme.
+            - Baue KEINE neue AVAudioEngine-Ausgabe-Graphkette nur für Pitch/Effekt ein, wenn dieselbe Wirkung stabil über AVSpeechSynthesizer erreichbar ist.
+            - Wenn du eine neue Voice-Klasse erstellst, entferne oder migriere ALLE alten Verweise vollständig.
+            - Bestehende Spracherkennung, Entwicklermodus, Updatefunktion und Installationsbestätigung müssen erhalten bleiben.
+            """ : ""
+
+            let basePrompt = """
+            Du arbeitest direkt am vollständigen Jarvis-Projekt im aktuellen Arbeitsordner.
+
+            AUFTRAG DES BENUTZERS:
+            \(instruction)
+            \(voiceRules)
+            \(designRules)
+
+            ÄNDERE DIE DATEIEN TATSÄCHLICH:
+            - Verwende Read/Edit/Write und bearbeite den Projektstand direkt.
+            - Antworte nicht nur mit einer Beschreibung oder einem Codeblock.
+            - Du darfst Swift-Dateien erstellen, löschen, aufteilen und ersetzen.
+            - Mindestens eine kompilierbare Swift-Datei mit macOS-App-Einstiegspunkt muss erhalten bleiben.
+            - Alle Swift-Dateien werden danach mit SwiftUI, AppKit, AVFoundation und Speech kompiliert.
+            - Sprachsteuerung und zukünftige Entwicklung müssen erhalten bleiben.
+            - Keine Zugangsdaten einbauen und keine macOS-Sicherheitsmechanismen umgehen.
+            - Installiere die App nicht selbst; Build, Signatur und Installation übernimmt Jarvis.
+            """
+
+            let before=projectFingerprint(claudeProjectWorkspace)
+            let status=await runClaudePass(
+                prompt:basePrompt,
+                workspace:claudeProjectWorkspace,
+                label:"CLAUDE PROGRAMMIERT 1/1",
+                timeout:1200
+            )
+            let after=projectFingerprint(claudeProjectWorkspace)
+            let files=swiftFiles(in:claudeProjectWorkspace)
+
+            if !files.isEmpty, before != after, original != after {
+                if designFocused {
+                    let changedUI=uiProjectFingerprint(claudeProjectWorkspace)
+                    guard changedUI != originalUI else {
+                        let report=(try? String(contentsOf:developmentDirectory.appendingPathComponent("Letzter-Claude-Bericht.txt"),encoding:.utf8)) ?? ""
+                        let error=(try? String(contentsOf:developmentDirectory.appendingPathComponent("Letzter-Claude-Fehler.txt"),encoding:.utf8)) ?? ""
+                        let diagnostic="CLAUDE-LAUF BEENDET, ABER OHNE UI-ÄNDERUNG. KEIN AUTOMATISCHER ZWEITVERSUCH.\\n\\nBERICHT:\\n\\(report)\\n\\nFEHLER:\\n\\(error)"
+                        try? diagnostic.write(to:developmentDirectory.appendingPathComponent("Claude-Diagnose.txt"),atomically:true,encoding:.utf8)
+                        claudeCodeStatus="KEINE UI-ÄNDERUNG // 1/1"
+                        return nil
+                    }
+                }
+
+                claudeCodeAvailable=true
+                claudeCodeStatus=status == 0 ? "PROJEKT GEÄNDERT // 1/1" : "PROJEKT GEÄNDERT / CLAUDE ENDE \\(status)"
+                return claudeProjectWorkspace
+            }
+
+            let report=(try? String(contentsOf:developmentDirectory.appendingPathComponent("Letzter-Claude-Bericht.txt"),encoding:.utf8)) ?? ""
+            let error=(try? String(contentsOf:developmentDirectory.appendingPathComponent("Letzter-Claude-Fehler.txt"),encoding:.utf8)) ?? ""
+            let combined=(report+"\\n"+error).lowercased()
+            let limitDetected=combined.contains("session limit") || combined.contains("usage limit") || combined.contains("rate limit")
+            let executionError=combined.contains("execution error")
+            let headline = limitDetected ? "CLAUDE-LIMIT ERREICHT" : (executionError ? "CLAUDE EXECUTION ERROR" : "CLAUDE HAT KEINE DATEIÄNDERUNG ERZEUGT")
+            let diagnostic="\\(headline). ES WURDE BEWUSST KEIN AUTOMATISCHER ZWEITVERSUCH GESTARTET.\\n\\nBERICHT:\\n\\(report)\\n\\nFEHLER:\\n\\(error)"
+            try? diagnostic.write(to:developmentDirectory.appendingPathComponent("Claude-Diagnose.txt"),atomically:true,encoding:.utf8)
+            claudeCodeStatus=limitDetected ? "LIMIT ERREICHT // STOPP" : (executionError ? "EXECUTION ERROR // STOPP" : "KEINE ÄNDERUNG // 1/1")
+            return nil
+        } catch {
+            let message="PROJEKTFEHLER: \(error.localizedDescription)"
+            try? message.write(to:developmentDirectory.appendingPathComponent("Claude-Diagnose.txt"),atomically:true,encoding:.utf8)
+            claudeCodeStatus=message
+            return nil
+        }
+    }
+
+    private func repairClaudeProject(_ project:URL,buildError:String,attempt:Int) async -> Bool {
+        let original=projectFingerprint(project)
+        let clipped=String(buildError.suffix(24000))
+        let prompt="""
+        Der Jarvis-Projektstand wurde vom echten Swift-Compiler abgelehnt.
+        Reparaturdurchlauf \(attempt) von maximal 6.
+
+        COMPILERFEHLER:
+        \(clipped)
+
+        Repariere den GESAMTEN Projektstand direkt im aktuellen Arbeitsordner.
+        WICHTIG:
+        - Lies zuerst alle Swift-Dateien, die an den gemeldeten Symbolen beteiligt sind.
+        - Wenn Code in eine neue Datei/Klasse ausgelagert wurde, entferne oder migriere die alte Implementierung vollständig.
+        - Keine verwaisten Verweise auf engine, recognizer, task, request, synth oder alte Voice-Methoden zurücklassen.
+        - Keine parallele alte und neue Spracharchitektur im selben Controller stehen lassen.
+        - Der Benutzerauftrag darf nicht zurückgenommen werden.
+        - Verwende nur SwiftUI, AppKit, AVFoundation, Speech und Foundation.
+        - Bei reinen Stimmänderungen AVSpeechSynthesizer bevorzugen; keine unnötige AVAudioEngine-Effektkette erzeugen.
+        - Ein Audiofehler darf niemals absichtlich abort()/SIGABRT auslösen.
+        - Installiere nichts und ersetze die laufende App nicht.
+        - Bearbeite die Dateien tatsächlich. Beende erst, wenn alle im Compilerbericht zusammenhängenden Fehler behoben sind.
+        """
+        _=await runClaudePass(prompt:prompt,workspace:project,label:"CLAUDE REPARIERT BUILD",timeout:1200)
+        if !swiftFiles(in:project).isEmpty && projectFingerprint(project) != original { return true }
+
+        // Ein einmaliger frischer Reparaturpass fängt abgebrochene Claude-Streams ab.
+        let retryPrompt="""
+        Der vorherige automatische Reparaturpass hat keine verwertbare Dateiänderung hinterlassen.
+        Arbeite jetzt ausschließlich als Swift-Build-Reparaturagent.
+        Lies die betroffenen Swift-Dateien und behebe diese Compilerfehler vollständig:
+        \(clipped)
+        Keine Erklärungen statt Dateiänderungen. Keine Installation. Bestehenden Benutzerauftrag erhalten.
+        """
+        _=await runClaudePass(prompt:retryPrompt,workspace:project,label:"CLAUDE REPARATUR WIEDERHOLUNG",timeout:1200)
+        return !swiftFiles(in:project).isEmpty && projectFingerprint(project) != original
+    }
+
+    func processDeveloperInstruction(_ instruction:String) async {
+        let clean=instruction.trimmingCharacters(in:.whitespacesAndNewlines)
+        guard developerMode, !clean.isEmpty else{return}
+        checkClaudeCode()
+        guard claudeCodeAvailable else {
+            developmentStatus="CLAUDE CODE NICHT BEREIT"
+            speak("Claude Code ist nicht erreichbar. Ich habe nichts verändert.")
+            return
+        }
+
+        developerInstruction=clean
+        candidateReady=false
+        awaitingDeveloperInstallConfirmation=false
+        developmentProgress=0.08
+        developmentProgressText="PROJEKT VORBEREITEN"
+        developmentStatus="PROJEKT VORBEREITEN"
+
+        guard let source=await loadDevelopmentSource() else {
+            developmentProgress=0
+            developmentProgressText="QUELLCODEFEHLER"
+            developmentStatus="QUELLCODEFEHLER"
+            speak("Ich konnte meine aktuelle Codebasis nicht vorbereiten.")
+            return
+        }
+
+        speak("Verstanden. Claude Code bearbeitet jetzt genau diesen Entwicklungsabschnitt in einem einzigen Durchlauf. Danach prüfe ich den Build lokal.")
+        developmentProgress=0.20
+        developmentProgressText="CLAUDE PROGRAMMIERT"
+        developmentStatus="CLAUDE PROGRAMMIERT"
+
+        guard let project=await runClaudeWorkspaceEdit(instruction:clean,source:source) else {
+            developmentProgress=0
+            developmentProgressText="CLAUDE HAT NICHTS GEÄNDERT"
+            developmentStatus="CLAUDE CODE FEHLER"
+            speak("Claude Code hat in diesem einen Durchlauf keinen verwertbaren Projektstand erzeugt. Ich starte bewusst keinen zweiten Versuch. Die laufende Version bleibt unverändert und die Diagnose wurde gespeichert.")
+            return
+        }
+
+        let fm=FileManager.default
+        let newVersion=nextDeveloperVersion()
+        let buildLog=developmentDirectory.appendingPathComponent("Letzter-Build-Fehler.txt")
+        var compileSucceeded=false
+
+        do {
+            try? fm.removeItem(at:developerCandidateAppURL)
+            let macos=developerCandidateAppURL.appendingPathComponent("Contents/MacOS",isDirectory:true)
+            try fm.createDirectory(at:macos,withIntermediateDirectories:true)
+            let contents=developerCandidateAppURL.appendingPathComponent("Contents",isDirectory:true)
+            let plist=contents.appendingPathComponent("Info.plist")
+            try writeCandidateInfoPlist(version:newVersion,to:plist)
+            try newVersion.write(to:project.appendingPathComponent("JARVIS_VERSION.txt"),atomically:true,encoding:.utf8)
+
+            let binary=macos.appendingPathComponent("JarvisZero")
+
+            let files=swiftFiles(in:project)
+            if !files.isEmpty {
+                developmentProgress=0.58
+                developmentProgressText="LOKAL KOMPILIEREN"
+                developmentStatus="LOKALER BUILD"
+
+                try? fm.removeItem(at:binary)
+                var arguments=["swiftc","-parse-as-library"]
+                arguments.append(contentsOf:files.map{$0.path})
+                arguments.append(contentsOf:[
+                    "-o",binary.path,
+                    "-framework","SwiftUI",
+                    "-framework","AppKit",
+                    "-framework","AVFoundation",
+                    "-framework","Speech"
+                ])
+
+                let result=runProcessCaptured("/usr/bin/xcrun",arguments,logURL:buildLog)
+                compileSucceeded = result.0 == 0 && fm.fileExists(atPath:binary.path)
+            }
+            guard compileSucceeded else {
+                candidateReady=false
+                developmentProgress=0
+                developmentProgressText="LOKALER BUILD FEHLERHAFT"
+                developmentStatus="KANDIDAT VERWORFEN"
+                speak("Der neue Projektstand ist noch nicht kompilierbar. Ich starte keine automatische Claude Reparatur und verbrauche kein weiteres Kontingent. Die laufende Version bleibt unverändert und der Compilerfehler wurde gespeichert.")
+                return
+            }
+
+            _=runProcess("/bin/chmod",["+x",binary.path])
+
+            developmentProgress=0.90
+            developmentProgressText="SIGNIEREN UND PRÜFEN"
+            developmentStatus="SIGNIERPRÜFUNG"
+            let sign=runProcess("/usr/bin/codesign",["--force","--deep","--sign","-",developerCandidateAppURL.path])
+            guard sign == 0,
+                  runProcess("/usr/bin/codesign",["--verify","--deep","--strict",developerCandidateAppURL.path]) == 0 else {
+                candidateReady=false
+                developmentProgress=0
+                developmentProgressText="SIGNIERFEHLER"
+                developmentStatus="SIGNIERPRÜFUNG FEHLER"
+                speak("Der neue Build hat die Signierprüfung nicht bestanden und wurde nicht übernommen.")
+                return
+            }
+
+            try? fm.removeItem(at:activeProjectDirectory)
+            try fm.copyItem(at:project,to:activeProjectDirectory)
+
+            candidateReady=true
+            awaitingDeveloperInstallConfirmation=true
+            developmentProgress=1.0
+            developmentProgressText="VERSION \(newVersion) BEREIT"
+            developmentStatus="ENTWICKLUNG BEREIT"
+            speak("Die neue Jarvis Version \(newVersion) ist fertig, kompiliert und signiert. Nach der Installation überwache ich den Start zwanzig Sekunden und rolle bei einem frühen Absturz automatisch zurück. Soll ich sie jetzt installieren?")
+        } catch {
+            candidateReady=false
+            developmentProgress=0
+            developmentProgressText="ENTWICKLUNGSFEHLER"
+            developmentStatus="ENTWICKLUNGSFEHLER"
+            speak("Beim Aufbau des neuen Jarvis ist ein Fehler aufgetreten. Die bisherige Version bleibt erhalten.")
+        }
+    }
+
+    func installDeveloperCandidate() {
+        guard candidateReady,
+              FileManager.default.fileExists(atPath:developerCandidateAppURL.path) else {
+            awaitingDeveloperInstallConfirmation=false
+            developmentStatus="KEIN KANDIDAT"
+            speak("Es ist gerade keine geprüfte Entwicklung zur Installation vorhanden.")
+            return
+        }
+
+        awaitingDeveloperInstallConfirmation=false
+        let fm=FileManager.default
+        let home=fm.homeDirectoryForCurrentUser
+        let target=home.appendingPathComponent("Applications/Jarvis-ZERO.app",isDirectory:true)
+        let backup=home.appendingPathComponent("Applications/Jarvis-ZERO-Backup.app",isDirectory:true)
+        let desktopLink=home.appendingPathComponent("Desktop/Jarvis.app")
+        let log=home.appendingPathComponent("Desktop/Jarvis-Entwicklung.log")
+        let helper=developmentDirectory.appendingPathComponent("install-dev.sh")
+
+        let shell = """
+        #!/bin/bash
+        set -u
+        TARGET="\(target.path)"
+        BACKUP="\(backup.path)"
+        NEW="\(developerCandidateAppURL.path)"
+        LOG="\(log.path)"
+        DESKTOP_LINK="\(desktopLink.path)"
+
+        exec >>"$LOG" 2>&1
+        echo "=== JARVIS ENTWICKLERMODUS ==="
+        date
+
+        /bin/rm -rf "$BACKUP"
+        if [ -d "$TARGET" ]; then
+          /bin/cp -R "$TARGET" "$BACKUP" || exit 31
+        fi
+
+        /usr/bin/pkill -TERM -x JarvisZero 2>/dev/null || true
+        sleep 1
+
+        /bin/rm -rf "$TARGET"
+        /bin/cp -R "$NEW" "$TARGET" || {
+          /bin/rm -rf "$TARGET"
+          [ -d "$BACKUP" ] && /bin/cp -R "$BACKUP" "$TARGET"
+          exit 32
+        }
+
+        /usr/bin/xattr -dr com.apple.quarantine "$TARGET" 2>/dev/null || true
+        /usr/bin/codesign --verify --deep --strict "$TARGET" || {
+          /bin/rm -rf "$TARGET"
+          [ -d "$BACKUP" ] && /bin/cp -R "$BACKUP" "$TARGET"
+          /usr/bin/open -n "$TARGET" 2>/dev/null || true
+          exit 33
+        }
+
+        /bin/rm -rf "$DESKTOP_LINK"
+        /bin/ln -s "$TARGET" "$DESKTOP_LINK"
+        /usr/bin/open -n "$TARGET"
+
+        echo "RUNTIME STARTTEST - 20 SEKUNDEN"
+        HEALTHY=1
+        for SECOND in $(/usr/bin/seq 1 20); do
+          sleep 1
+          if ! /usr/bin/pgrep -x JarvisZero >/dev/null 2>&1; then
+            echo "PROZESS NACH $SECOND SEKUNDEN BEENDET"
+            HEALTHY=0
+            break
+          fi
+        done
+
+        if [ "$HEALTHY" -eq 1 ]; then
+          echo "SUCCESS - 20 SEKUNDEN STABIL"
+          exit 0
+        fi
+
+        echo "START/RUNTIME FEHLER - ROLLBACK"
+        /bin/rm -rf "$TARGET"
+        if [ -d "$BACKUP" ]; then
+          /bin/cp -R "$BACKUP" "$TARGET"
+          /usr/bin/open -n "$TARGET" 2>/dev/null || true
+        fi
+        exit 34
+        """
+
+        do {
+            try shell.write(to:helper,atomically:true,encoding:.utf8)
+            _=runProcess("/bin/chmod",["+x",helper.path])
+            developmentProgress=1.0
+            developmentProgressText="INSTALLATION"
+            developmentStatus="INSTALLATION"
+            speak("Verstanden. Ich installiere die geprüfte Entwicklung und starte anschließend neu.")
+
+            let launcher=Process()
+            launcher.executableURL=URL(fileURLWithPath:"/usr/bin/nohup")
+            launcher.arguments=["/bin/bash",helper.path]
+            launcher.standardOutput=FileHandle.nullDevice
+            launcher.standardError=FileHandle.nullDevice
+            try launcher.run()
+
+            DispatchQueue.main.asyncAfter(deadline:.now()+1.2) {
+                NSApp.terminate(nil)
+            }
+        } catch {
+            developmentStatus="INSTALLATIONSFEHLER"
+            speak("Die Installation konnte nicht gestartet werden. Die aktuelle Version bleibt erhalten.")
+        }
+    }
+    func runSelfDevelopmentCycle() async {
+        guard localAI else {
+            developmentStatus = "KI NICHT BEREIT"
+            return
+        }
+        developmentStatus = "QUELLCODE LADEN"
+        guard let url=URL(string:Self.selfSourceURL) else {
+            developmentStatus = "QUELLCODEFEHLER"
+            return
+        }
+        do {
+            var req=URLRequest(url:url)
+            req.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+            req.timeoutInterval = 30
+            let (data,response)=try await URLSession.shared.data(for:req)
+            guard (response as? HTTPURLResponse)?.statusCode == 200,
+                  let source=String(data:data,encoding:.utf8) else {
+                developmentStatus = "QUELLCODEFEHLER"
+                return
+            }
+
+            developmentStatus = "KANDIDAT ENTWICKELN"
+            let prompt = """
+            Du verbesserst eine SwiftUI macOS-App namens Jarvis ZERO.
+            Erstelle aus dem folgenden Quellcode eine konservativ verbesserte Version.
+            Regeln:
+            - Bestehende Funktionen und Update-Mechanismus erhalten.
+            - Keine neuen kostenpflichtigen APIs.
+            - Keine geheimen Daten oder Zugangsdaten einbauen.
+            - Keine selbstständige Installation oder Ersetzung der laufenden App.
+            - Nur eine kleine, sinnvolle Verbesserung.
+            - Gib ausschließlich vollständigen Swift-Quellcode zurück, ohne Markdown.
+            QUELLCODE:
+            \(source)
+            """
+
+            let candidate:String?
+            if claudeCodeAvailable {
+                developmentStatus = "CLAUDE CODE ENTWICKELT"
+                candidate = await askClaudeCode(prompt, workingDirectory: developmentDirectory)
+            } else {
+                developmentStatus = "OLLAMA ENTWICKELT"
+                candidate = await askOllamaRaw(prompt)
+            }
+
+            guard let candidate,
+                  candidate.contains("import SwiftUI"),
+                  candidate.contains("@main struct JarvisZeroApp") else {
+                developmentStatus = "KANDIDAT UNGÜLTIG"
+                return
+            }
+
+            let candidateFile=developmentDirectory.appendingPathComponent("Kandidat.swift")
+            try candidate.write(to:candidateFile,atomically:true,encoding:.utf8)
+
+            developmentStatus = "KANDIDAT PRÜFEN"
+            let binary=developmentDirectory.appendingPathComponent("Kandidat")
+            try? FileManager.default.removeItem(at:binary)
+            let result=runProcess("/usr/bin/xcrun",[
+                "swiftc","-parse-as-library",candidateFile.path,
+                "-o",binary.path,
+                "-framework","SwiftUI",
+                "-framework","AppKit",
+                "-framework","AVFoundation",
+                "-framework","Speech"
+            ])
+            guard result == 0, FileManager.default.fileExists(atPath:binary.path) else {
+                candidateReady=false
+                developmentStatus = "KANDIDAT VERWORFEN"
+                return
+            }
+
+            candidateReady=true
+            developmentStatus = "KANDIDAT GEPRÜFT"
+        } catch {
+            candidateReady=false
+            developmentStatus = "ENTWICKLUNGSFEHLER"
+        }
+    }
+
+
+    private func findClaudeBinary() -> String? {
+        let candidates=[
+            "/opt/homebrew/bin/claude",
+            "/usr/local/bin/claude",
+            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin/claude").path
+        ]
+        if let direct=candidates.first(where:{ FileManager.default.isExecutableFile(atPath:$0) }) {
+            return direct
+        }
+        if let which=runCapture("/usr/bin/which",["claude"])?.trimmingCharacters(in:.whitespacesAndNewlines),
+           !which.isEmpty,
+           FileManager.default.isExecutableFile(atPath:which) {
+            return which
+        }
+        return nil
+    }
+
+    func checkClaudeCode() {
+        guard let claude=findClaudeBinary() else {
+            claudeCodeAvailable=false
+            claudeCodeStatus="NICHT GEFUNDEN"
+            return
+        }
+
+        let version=runCapture(claude,["--version"])?.trimmingCharacters(in:.whitespacesAndNewlines) ?? ""
+        let auth=runCapture(claude,["auth","status","--text"])?.trimmingCharacters(in:.whitespacesAndNewlines) ?? ""
+
+        if auth.isEmpty {
+            claudeCodeAvailable=false
+            claudeCodeStatus=version.isEmpty ? "NICHT ANGEMELDET" : "NICHT ANGEMELDET // \(version)"
+        } else {
+            claudeCodeAvailable=true
+            claudeCodeStatus=version.isEmpty ? "VERBUNDEN + ANGEMELDET" : "VERBUNDEN + ANGEMELDET // \(version)"
+        }
+    }
+
+    private func askClaudeCode(_ prompt:String, workingDirectory:URL? = nil) async -> String? {
+        guard let claude=findClaudeBinary() else {
+            claudeCodeAvailable=false
+            claudeCodeStatus="NICHT GEFUNDEN"
+            return nil
+        }
+
+        claudeCodeStatus="ARBEITET"
+        let result:String? = await Task.detached(priority:.userInitiated) {
+            let fm=FileManager.default
+            let base=workingDirectory ?? fm.temporaryDirectory
+            let token=UUID().uuidString
+            let outURL=base.appendingPathComponent("claude-output-\(token).txt")
+            let errURL=base.appendingPathComponent("claude-error-\(token).txt")
+
+            fm.createFile(atPath:outURL.path,contents:nil)
+            fm.createFile(atPath:errURL.path,contents:nil)
+
+            guard let outHandle=try? FileHandle(forWritingTo:outURL),
+                  let errHandle=try? FileHandle(forWritingTo:errURL) else {
+                return nil
+            }
+
+            defer {
+                try? outHandle.close()
+                try? errHandle.close()
+                try? fm.removeItem(at:outURL)
+                try? fm.removeItem(at:errURL)
+            }
+
+            let p=Process()
+            p.executableURL=URL(fileURLWithPath:claude)
+            p.arguments=["-p",prompt]
+            if let dir=workingDirectory { p.currentDirectoryURL=dir }
+            p.standardOutput=outHandle
+            p.standardError=errHandle
+
+            do {
+                try p.run()
+                let timeout:TimeInterval=420
+                let started=Date()
+
+                while p.isRunning && Date().timeIntervalSince(started) < timeout {
+                    Thread.sleep(forTimeInterval:0.25)
+                }
+
+                if p.isRunning {
+                    p.terminate()
+                    Thread.sleep(forTimeInterval:0.4)
+                    if p.isRunning { p.interrupt() }
+                }
+
+                p.waitUntilExit()
+                try? outHandle.synchronize()
+                try? errHandle.synchronize()
+
+                guard p.terminationStatus == 0,
+                      let data=try? Data(contentsOf:outURL),
+                      !data.isEmpty else { return nil }
+
+                return String(data:data,encoding:.utf8)?
+                    .trimmingCharacters(in:.whitespacesAndNewlines)
+            } catch {
+                return nil
+            }
+        }.value
+
+        if let result, !result.isEmpty {
+            claudeCodeAvailable=true
+            claudeCodeStatus="BEREIT"
+            return result
+        } else {
+            claudeCodeStatus="FEHLER ODER ZEITLIMIT"
+            return nil
+        }
+    }
+
+    func checkLocalAI() async {
+        aiSetupStatus = "PRÜFE LOKALE KI"
+        guard let url=URL(string:"http://127.0.0.1:11434/api/tags") else{return}
+
+        func probe() async -> [String]? {
+            var r=URLRequest(url:url)
+            r.timeoutInterval=1.5
+            do {
+                let (data,resp)=try await URLSession.shared.data(for:r)
+                guard (resp as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+                let obj=try JSONSerialization.jsonObject(with:data) as? [String:Any]
+                let models=(obj?["models"] as? [[String:Any]]) ?? []
+                return models.compactMap { $0["name"] as? String }
+            } catch { return nil }
+        }
+
+        var names = await probe()
+        if names == nil, let ollama=findOllamaBinary() {
+            aiSetupStatus="STARTE KI-DIENST"
+            let p=Process()
+            p.executableURL=URL(fileURLWithPath:ollama)
+            p.arguments=["serve"]
+            p.standardOutput=FileHandle.nullDevice
+            p.standardError=FileHandle.nullDevice
+            try? p.run()
+            try? await Task.sleep(nanoseconds:1_200_000_000)
+            names=await probe()
+        }
+
+        guard let available=names else {
+            localAI=false
+            localAIModel="NICHT VERBUNDEN"
+            aiSetupStatus=findOllamaBinary() == nil ? "OLLAMA FEHLT" : "KI-DIENST NICHT ERREICHBAR"
+            return
+        }
+
+        if let preferred=available.first(where:{ $0.lowercased().contains("qwen2.5:3b") }) {
+            localAI=true
+            localAIModel=preferred
+            aiSetupStatus="KI BEREIT"
+        } else if let first=available.first {
+            localAI=true
+            localAIModel=first
+            aiSetupStatus="KI BEREIT"
+        } else {
+            localAI=false
+            localAIModel="KEIN MODELL"
+            aiSetupStatus="MODELL FEHLT"
+        }
+    }
+
+    private func findOllamaBinary() -> String? {
+        let candidates=[
+            "/opt/homebrew/bin/ollama",
+            "/usr/local/bin/ollama",
+            "/Applications/Ollama.app/Contents/Resources/ollama"
+        ]
+        return candidates.first { FileManager.default.isExecutableFile(atPath:$0) }
+    }
+
+    func confirmAndSetupAI() {
+        guard !aiInstalling else{return}
+        let alert=NSAlert()
+        alert.messageText="Lokale KI für Jarvis einrichten?"
+        alert.informativeText="Jarvis lädt das lokale Modell qwen2.5:3b über Ollama. Das Modell benötigt mehrere Gigabyte Speicherplatz und bleibt lokal auf diesem Mac."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle:"KI einrichten")
+        alert.addButton(withTitle:"Abbrechen")
+        if alert.runModal() == .alertFirstButtonReturn {
+            Task { await setupLocalAI() }
+        }
+    }
+
+    func setupLocalAI() async {
+        guard !aiInstalling else{return}
+        aiInstalling=true
+        defer { aiInstalling=false }
+
+        guard let ollama=findOllamaBinary() else {
+            aiSetupStatus="OLLAMA FEHLT"
+            speak("Ollama ist auf diesem Mac noch nicht installiert. Installiere Ollama einmal, danach kann ich das lokale KI-Modell selbst einrichten.")
+            return
+        }
+
+        aiSetupStatus="STARTE KI-DIENST"
+        let server=Process()
+        server.executableURL=URL(fileURLWithPath:ollama)
+        server.arguments=["serve"]
+        server.standardOutput=FileHandle.nullDevice
+        server.standardError=FileHandle.nullDevice
+        try? server.run()
+        try? await Task.sleep(nanoseconds:1_000_000_000)
+
+        aiSetupStatus="LADE KI-MODELL"
+        let pull=Process()
+        pull.executableURL=URL(fileURLWithPath:ollama)
+        pull.arguments=["pull","qwen2.5:3b"]
+        pull.standardOutput=FileHandle.nullDevice
+        pull.standardError=FileHandle.nullDevice
+        do {
+            try pull.run()
+            pull.waitUntilExit()
+            guard pull.terminationStatus == 0 else {
+                aiSetupStatus="MODELL-DOWNLOAD FEHLER"
+                return
+            }
+        } catch {
+            aiSetupStatus="MODELL-DOWNLOAD FEHLER"
+            return
+        }
+
+        await checkLocalAI()
+        if localAI {
+            speak("Die lokale KI ist eingerichtet und einsatzbereit.")
+        }
+    }
+
+    func checkForUpdates() async {
+        updateStatus = "PRÜFUNG…"
+        let url = Self.manifestURL + "?t=\(Int(Date().timeIntervalSince1970))"
+
+        guard let output = runCapture("/usr/bin/curl", [
+            "-L", "--fail", "--silent", "--show-error",
+            "--connect-timeout", "5",
+            "--max-time", "12",
+            "-H", "Cache-Control: no-cache",
+            url
+        ]) else {
+            updateAvailable = false
+            updateStatus = "NETZWERKFEHLER"
+            return
+        }
+
+        guard let data = output.data(using: .utf8) else {
+            updateAvailable = false
+            updateStatus = "DATENFEHLER"
+            return
+        }
+
+        do {
+            let manifest = try JSONDecoder().decode(JarvisUpdateManifest.self, from: data)
+            latestVersion = manifest.latestVersion
+            updateNotes = manifest.releaseNotes
+            pendingPackageURL = manifest.package
+            pendingSHA256 = manifest.sha256
+            updateAvailable = isVersion(manifest.latestVersion, newerThan: Self.currentVersion)
+                && manifest.package != nil
+                && manifest.sha256 != nil
+            updateStatus = updateAvailable ? "UPDATE \(manifest.latestVersion)" : "AKTUELL"
+        } catch {
+            updateAvailable = false
+            updateStatus = "LESEFEHLER"
+        }
+    }
+
+    private func isVersion(_ remote:String, newerThan local:String) -> Bool {
+        let a = remote.split(separator:".").map { Int($0) ?? 0 }
+        let b = local.split(separator:".").map { Int($0) ?? 0 }
+        let n = max(a.count,b.count)
+        for i in 0..<n {
+            let x = i < a.count ? a[i] : 0
+            let y = i < b.count ? b[i] : 0
+            if x != y { return x > y }
+        }
+        return false
+    }
+    func confirmAndInstallUpdate() {
+        guard updateAvailable else { Task { await checkForUpdates() }; return }
+        let alert = NSAlert()
+        alert.messageText = "JARVIS Update \(latestVersion) installieren?"
+        alert.informativeText = "Jarvis erstellt zuerst ein Backup. Das Update wird nur nach deiner Bestätigung installiert."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Update installieren")
+        alert.addButton(withTitle: "Abbrechen")
+        if alert.runModal() == .alertFirstButtonReturn { Task { await installPendingUpdate() } }
+    }
+    private func installPendingUpdate() async {
+        guard let urlText = pendingPackageURL,
+              let expected = pendingSHA256?.lowercased(),
+              let url = URL(string: urlText) else {
+            updateStatus = "UPDATE UNGÜLTIG"
+            return
+        }
+
+        updateStatus = "WIRD GELADEN"
+        do {
+            var request = URLRequest(url: url)
+            request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+            request.timeoutInterval = 30
+            request.setValue("Jarvis-ZERO/\(Self.currentVersion)", forHTTPHeaderField: "User-Agent")
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                updateStatus = "DOWNLOADFEHLER"
+                return
+            }
+
+            let fm = FileManager.default
+            let work = fm.temporaryDirectory.appendingPathComponent("JarvisUpdate-\(UUID().uuidString)", isDirectory: true)
+            try fm.createDirectory(at: work, withIntermediateDirectories: true)
+
+            let source = work.appendingPathComponent("JarvisZero.swift")
+            try data.write(to: source, options: .atomic)
+
+            updateStatus = "DATEIPRÜFUNG"
+            guard let actual = sha256(of: source), actual == expected else {
+                updateStatus = "PRÜFSUMMENFEHLER"
+                return
+            }
+
+            let app = work.appendingPathComponent("Jarvis-ZERO.app", isDirectory: true)
+            let macos = app.appendingPathComponent("Contents/MacOS", isDirectory: true)
+            let resources = app.appendingPathComponent("Contents/Resources", isDirectory: true)
+            try fm.createDirectory(at: macos, withIntermediateDirectories: true)
+            try fm.createDirectory(at: resources, withIntermediateDirectories: true)
+
+            let plist = app.appendingPathComponent("Contents/Info.plist")
+            let currentPlist = Bundle.main.bundleURL.appendingPathComponent("Contents/Info.plist")
+            try fm.copyItem(at: currentPlist, to: plist)
+
+            _ = runProcess("/usr/libexec/PlistBuddy", ["-c", "Set :CFBundleShortVersionString \(latestVersion)", plist.path])
+            _ = runProcess("/usr/libexec/PlistBuddy", ["-c", "Set :CFBundleVersion \(latestVersion.replacingOccurrences(of: ".", with: ""))", plist.path])
+
+            let binary = macos.appendingPathComponent("JarvisZero")
+            updateStatus = "WIRD VORBEREITET"
+            let compile = runProcess("/usr/bin/xcrun", [
+                "swiftc", "-parse-as-library", source.path,
+                "-o", binary.path,
+                "-framework", "SwiftUI",
+                "-framework", "AppKit",
+                "-framework", "AVFoundation",
+                "-framework", "Speech"
+            ])
+            guard compile == 0, fm.fileExists(atPath: binary.path) else {
+                updateStatus = "KOMPILIERFEHLER"
+                return
+            }
+
+            _ = runProcess("/bin/chmod", ["+x", binary.path])
+            let sign = runProcess("/usr/bin/codesign", ["--force", "--deep", "--sign", "-", app.path])
+            guard sign == 0 else {
+                updateStatus = "SIGNIERFEHLER"
+                return
+            }
+
+            let home = fm.homeDirectoryForCurrentUser
+            let apps = home.appendingPathComponent("Applications", isDirectory: true)
+            try fm.createDirectory(at: apps, withIntermediateDirectories: true)
+
+            let target = apps.appendingPathComponent("Jarvis-ZERO.app", isDirectory: true)
+            let backup = apps.appendingPathComponent("Jarvis-ZERO-Backup.app", isDirectory: true)
+            let log = home.appendingPathComponent("Desktop/Jarvis-Update.log")
+            let desktopLink = home.appendingPathComponent("Desktop/Jarvis.app")
+            let helper = work.appendingPathComponent("install.sh")
+
+            let shell = """
+            #!/bin/bash
+            set -u
+
+            TARGET=\"\(target.path)\"
+            BACKUP=\"\(backup.path)\"
+            NEW=\"\(app.path)\"
+            LOG=\"\(log.path)\"
+            DESKTOP_LINK=\"\(desktopLink.path)\"
+
+            exec >>"$LOG" 2>&1
+            echo "=== JARVIS UPDATE \(latestVersion) ==="
+            date
+            echo "Waiting for current Jarvis to close..."
+
+            for i in {1..30}; do
+              if ! /usr/bin/pgrep -x JarvisZero >/dev/null 2>&1; then
+                break
+              fi
+              sleep 0.2
+            done
+
+            /usr/bin/pkill -TERM -x JarvisZero 2>/dev/null || true
+            sleep 1
+
+            /bin/rm -rf "$BACKUP"
+            if [ -d "$TARGET" ]; then
+              /bin/cp -R "$TARGET" "$BACKUP" || exit 21
+            fi
+
+            /bin/rm -rf "$TARGET"
+            /bin/cp -R "$NEW" "$TARGET" || {
+              echo "Copy failed, restoring backup."
+              /bin/rm -rf "$TARGET"
+              [ -d "$BACKUP" ] && /bin/cp -R "$BACKUP" "$TARGET"
+              exit 22
+            }
+
+            /usr/bin/xattr -dr com.apple.quarantine "$TARGET" 2>/dev/null || true
+            /bin/rm -rf "$DESKTOP_LINK"
+            /bin/ln -s "$TARGET" "$DESKTOP_LINK"
+            /usr/bin/codesign --verify --deep --strict "$TARGET" || {
+              echo "Verification failed, restoring backup."
+              /bin/rm -rf "$TARGET"
+              [ -d "$BACKUP" ] && /bin/cp -R "$BACKUP" "$TARGET"
+              /usr/bin/open "$TARGET" 2>/dev/null || true
+              exit 23
+            }
+
+            echo "Installed app verified. Launching Jarvis..."
+            /usr/bin/open -n "$TARGET"
+            sleep 3
+
+            if /usr/bin/pgrep -x JarvisZero >/dev/null 2>&1; then
+              echo "SUCCESS: Jarvis \(latestVersion) is running."
+              echo "Desktop link: $DESKTOP_LINK"
+              exit 0
+            fi
+
+            echo "New Jarvis did not start. Rolling back."
+            /bin/rm -rf "$TARGET"
+            if [ -d "$BACKUP" ]; then
+              /bin/cp -R "$BACKUP" "$TARGET"
+              /usr/bin/open -n "$TARGET" 2>/dev/null || true
+            fi
+            exit 24
+            """
+
+            try shell.write(to: helper, atomically: true, encoding: .utf8)
+            _ = runProcess("/bin/chmod", ["+x", helper.path])
+
+            updateStatus = "NEUSTART"
+
+            let launcher = Process()
+            launcher.executableURL = URL(fileURLWithPath: "/usr/bin/nohup")
+            launcher.arguments = ["/bin/bash", helper.path]
+            launcher.standardOutput = FileHandle.nullDevice
+            launcher.standardError = FileHandle.nullDevice
+            try launcher.run()
+
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            NSApp.terminate(nil)
+        } catch {
+            updateStatus = "UPDATEFEHLER"
+        }
+    }
+
+    private func sha256(of url:URL) -> String? {
+        let pipe=Pipe(); let p=Process(); p.executableURL=URL(fileURLWithPath:"/usr/bin/shasum"); p.arguments=["-a","256",url.path]; p.standardOutput=pipe
+        do { try p.run(); p.waitUntilExit(); guard p.terminationStatus == 0 else{return nil}; let d=pipe.fileHandleForReading.readDataToEndOfFile(); return String(data:d,encoding:.utf8)?.split(separator:" ").first.map(String.init)?.lowercased() } catch { return nil }
+    }
+    private func runCapture(_ executable:String,_ args:[String]) -> String? {
+        let pipe = Pipe()
+        let err = Pipe()
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: executable)
+        p.arguments = args
+        p.standardOutput = pipe
+        p.standardError = err
+        do {
+            try p.run()
+            p.waitUntilExit()
+            guard p.terminationStatus == 0 else { return nil }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            return String(data: data, encoding: .utf8)
+        } catch {
+            return nil
+        }
+    }
+
+    @discardableResult private func runProcess(_ executable:String,_ args:[String]) -> Int32 {
+        let p=Process(); p.executableURL=URL(fileURLWithPath:executable); p.arguments=args
+        do { try p.run(); p.waitUntilExit(); return p.terminationStatus } catch { return -1 }
+    }
+
+    func startListening(){
+        guard !engine.isRunning else{return}
+        let req=SFSpeechAudioBufferRecognitionRequest(); req.shouldReportPartialResults=true; if recognizer?.supportsOnDeviceRecognition == true { req.requiresOnDeviceRecognition = true }; req.contextualStrings = ["Jarvis", "öffne Safari", "öffne Finder", "öffne Mail", "öffne Kalender", "öffne Notizen", "öffne Systemeinstellungen", "öffne Rechner", "mach einen Screenshot", "Lautstärke", "Update prüfen"]; request=req
+        let node=engine.inputNode; let format=node.outputFormat(forBus:0)
+        node.removeTap(onBus:0); node.installTap(onBus:0, bufferSize:1024, format:format){ [weak req] b,_ in req?.append(b) }
+        engine.prepare()
+        do { try engine.start(); listening=true; status="HÖRT ZU" } catch { status="MIKROFONFEHLER"; return }
+        task=recognizer?.recognitionTask(with:req){ [weak self] result,error in
+            guard let self else{return}
+            Task { @MainActor in
+                if let text=result?.bestTranscription.formattedString { self.transcript=text; self.maybeHandle(text) }
+                if error != nil || result?.isFinal == true { self.restartListeningSoon() }
+            }
+        }
+    }
+    func stopListening(){ task?.cancel(); task=nil; request?.endAudio(); request=nil; if engine.isRunning { engine.stop(); engine.inputNode.removeTap(onBus:0) }; listening=false; status="ONLINE" }
+    func restartListeningSoon(){
+        stopListening(); guard continuous else{return}; restartWork?.cancel(); restartWork=Task { try? await Task.sleep(nanoseconds:350_000_000); if !Task.isCancelled { self.startListening() } }
+    }
+    func maybeHandle(_ text:String){
+        let lower=text.lowercased(); guard lower.contains("jarvis") else{return}
+        var cmd=lower
+        if let r=cmd.range(of:"jarvis") { cmd=String(cmd[r.upperBound...]).trimmingCharacters(in:.whitespacesAndNewlines.union(.punctuationCharacters)) }
+        guard cmd.count>2, cmd != lastHandled else{return}; lastHandled=cmd
+        Task { await execute(cmd) }
+    }
+    func submit(_ text:String){ let clean=text.trimmingCharacters(in:.whitespacesAndNewlines); guard !clean.isEmpty else{return}; logs.append(LogLine(who:"DU",text:clean)); addContext("Nutzer",clean); Task{ await execute(clean.lowercased()) } }
+    func openBundle(_ id:String,_ label:String) async { if let u=NSWorkspace.shared.urlForApplication(withBundleIdentifier:id){ do{ _=try await NSWorkspace.shared.openApplication(at:u,configuration:.init()); speak("\(label) wurde geöffnet.") }catch{speak("\(label) konnte ich nicht öffnen.")} } }
+    private func decideRoute(_ cmd:String) async -> JarvisRoute {
+        let q=cmd.lowercased()
+        if q.hasPrefix("öffne ") || q.hasPrefix("starte ") || q.contains("screenshot") ||
+           q.contains("lautstärke") || q.contains("stumm") || q.contains("ton an") ||
+           q.contains("update prüfen") || q.contains("nach update suchen") { return .mac }
+        if q.hasPrefix("merke dir ") || q.hasPrefix("merk dir ") || q.hasPrefix("lerne ") ||
+           q.contains("was hast du gelernt") || q.contains("was weißt du über mich") { return .memory }
+        if q.contains("wetter") || q.contains("temperatur morgen") || q.contains("regen morgen") ||
+           q.contains("wird es morgen") { return .weather }
+        if q.contains("nachrichten") || q.contains("news") || q.contains("was ist heute passiert") ||
+           q.contains("was passiert auf der welt") || q.contains("weltgeschehen") { return .news }
+        if q.contains("heute") || q.contains("aktuell") || q.contains("gerade") ||
+           q.contains("neueste") || q.contains("preis") || q.contains("öffnungszeiten") { return .web }
+
+        if localAI {
+            let classify="""
+            Ordne die Nutzeranfrage genau einer Kategorie zu.
+            Antworte nur mit einem Wort:
+            MAC, GEDÄCHTNIS, WETTER, NACHRICHTEN, INTERNET oder LOKALEKI.
+            MAC = lokale Aktion am Mac.
+            GEDÄCHTNIS = merken oder gespeichertes Wissen.
+            WETTER = aktuelle Wetterfrage oder Vorhersage.
+            NACHRICHTEN = aktuelle Ereignisse und Nachrichten.
+            INTERNET = andere Informationen, die aktuelle Webdaten brauchen.
+            LOKALEKI = zeitunabhängige Erklärung, Unterhaltung, Schreiben oder allgemeines Wissen.
+            Anfrage: \(cmd)
+            """
+            if let result=await askOllamaRaw(classify)?.uppercased() {
+                if result.contains("WETTER") { return .weather }
+                if result.contains("NACHRICHTEN") { return .news }
+                if result.contains("INTERNET") { return .web }
+                if result.contains("GEDÄCHTNIS") { return .memory }
+                if result.contains("MAC") { return .mac }
+            }
+        }
+        return .localAI
+    }
+
+    private func locationFrom(_ cmd:String) -> String? {
+        let q=cmd.trimmingCharacters(in:.whitespacesAndNewlines)
+        if let r=q.range(of:" in ",options:.caseInsensitive) {
+            let candidate=String(q[r.upperBound...]).trimmingCharacters(in:.whitespacesAndNewlines.union(.punctuationCharacters))
+            if candidate.count >= 2 { return candidate }
+        }
+        return defaultLocation.isEmpty ? nil : defaultLocation
+    }
+
+    private func setDefaultLocation(_ location:String) {
+        let clean=location.trimmingCharacters(in:.whitespacesAndNewlines.union(.punctuationCharacters))
+        guard clean.count >= 2 else{return}
+        defaultLocation=clean
+        UserDefaults.standard.set(clean,forKey:"JarvisDefaultLocation")
+    }
+
+    private func weatherCodeText(_ code:Int) -> String {
+        switch code {
+        case 0: return "klar"
+        case 1,2: return "überwiegend klar"
+        case 3: return "bewölkt"
+        case 45,48: return "neblig"
+        case 51,53,55,56,57: return "Nieselregen"
+        case 61,63,65,66,67: return "Regen"
+        case 71,73,75,77: return "Schnee"
+        case 80,81,82: return "Regenschauer"
+        case 85,86: return "Schneeschauer"
+        case 95,96,99: return "Gewitter"
+        default: return "wechselhaft"
+        }
+    }
+
+    private func fetchWeather(_ cmd:String) async -> String? {
+        guard let place=locationFrom(cmd) else {
+            return "Für welchen Ort soll ich das Wetter prüfen? Du kannst zum Beispiel sagen: Jarvis, mein Ort ist Hof."
+        }
+        internetStatus="WETTERDATEN"
+        let encoded=place.addingPercentEncoding(withAllowedCharacters:.urlQueryAllowed) ?? place
+        guard let geoURL=URL(string:"https://geocoding-api.open-meteo.com/v1/search?name=\(encoded)&count=1&language=de&format=json") else{return nil}
+        do {
+            let (geoData,geoResp)=try await URLSession.shared.data(from:geoURL)
+            guard (geoResp as? HTTPURLResponse)?.statusCode == 200,
+                  let geo=try JSONSerialization.jsonObject(with:geoData) as? [String:Any],
+                  let results=geo["results"] as? [[String:Any]],
+                  let first=results.first,
+                  let lat=first["latitude"] as? Double,
+                  let lon=first["longitude"] as? Double else {
+                internetStatus="ORT NICHT GEFUNDEN"
+                return "Ich konnte den Ort \(place) nicht eindeutig finden."
+            }
+            let resolved=(first["name"] as? String) ?? place
+            let wantsTomorrow=cmd.lowercased().contains("morgen")
+            let fstr="https://api.open-meteo.com/v1/forecast?latitude=\(lat)&longitude=\(lon)&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=3"
+            guard let furl=URL(string:fstr) else{return nil}
+            let (data,resp)=try await URLSession.shared.data(from:furl)
+            guard (resp as? HTTPURLResponse)?.statusCode == 200,
+                  let obj=try JSONSerialization.jsonObject(with:data) as? [String:Any],
+                  let daily=obj["daily"] as? [String:Any],
+                  let maxs=daily["temperature_2m_max"] as? [Double],
+                  let mins=daily["temperature_2m_min"] as? [Double],
+                  let codes=daily["weather_code"] as? [Int],
+                  let rain=daily["precipitation_probability_max"] as? [Int] else {
+                internetStatus="WETTERFEHLER"; return nil
+            }
+            let i=wantsTomorrow ? 1 : 0
+            guard i<maxs.count,i<mins.count,i<codes.count,i<rain.count else{return nil}
+            internetStatus="BEREIT"
+            return "\(wantsTomorrow ? "Morgen" : "Heute") wird es in \(resolved) \(weatherCodeText(codes[i])). Die Temperatur liegt ungefähr zwischen \(Int(mins[i].rounded())) und \(Int(maxs[i].rounded())) Grad. Die maximale Regenwahrscheinlichkeit liegt bei \(rain[i]) Prozent."
+        } catch { internetStatus="WETTERFEHLER"; return nil }
+    }
+
+    private func decodeHTMLEntities(_ text:String) -> String {
+        var x=text
+        for (a,b) in ["&amp;":"&","&quot;":"\"","&#39;":"'","&lt;":"<","&gt;":">","&nbsp;":" "] {
+            x=x.replacingOccurrences(of:a,with:b)
+        }
+        return x
+    }
+
+    private func stripHTML(_ text:String) -> String {
+        let range=NSRange(location:0,length:(text as NSString).length)
+        let regex=try? NSRegularExpression(pattern:"<[^>]+>",options:[])
+        let clean=regex?.stringByReplacingMatches(in:text,options:[],range:range,withTemplate:"") ?? text
+        return decodeHTMLEntities(clean).trimmingCharacters(in:.whitespacesAndNewlines)
+    }
+
+    private func fetchNews(_ cmd:String) async -> String? {
+        internetStatus="NACHRICHTEN"
+        let lower=cmd.lowercased()
+        var query=""
+        if let r=lower.range(of:"über ") {
+            query=String(cmd[r.upperBound...]).trimmingCharacters(in:.whitespacesAndNewlines.union(.punctuationCharacters))
+        }
+        let urlString:String
+        if query.isEmpty {
+            urlString="https://news.google.com/rss?hl=de&gl=DE&ceid=DE:de"
+        } else {
+            let enc=query.addingPercentEncoding(withAllowedCharacters:.urlQueryAllowed) ?? query
+            urlString="https://news.google.com/rss/search?q=\(enc)&hl=de&gl=DE&ceid=DE:de"
+        }
+        guard let url=URL(string:urlString) else{return nil}
+        do {
+            let (data,resp)=try await URLSession.shared.data(from:url)
+            guard (resp as? HTTPURLResponse)?.statusCode == 200,
+                  let xml=String(data:data,encoding:.utf8) else{return nil}
+            let regex=try NSRegularExpression(pattern:"<item>.*?<title>(.*?)</title>.*?</item>",options:[.dotMatchesLineSeparators,.caseInsensitive])
+            let ns=xml as NSString
+            let matches=regex.matches(in:xml,range:NSRange(location:0,length:ns.length))
+            let titles=matches.prefix(5).compactMap { m -> String? in
+                guard m.numberOfRanges > 1 else{return nil}
+                return stripHTML(ns.substring(with:m.range(at:1)))
+            }
+            guard !titles.isEmpty else{return nil}
+            internetStatus="BEREIT"
+            let joined=titles.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator:" ")
+            return query.isEmpty ? "Die wichtigsten aktuellen Meldungen sind: \(joined)" : "Aktuelle Meldungen zu \(query): \(joined)"
+        } catch { internetStatus="NACHRICHTENFEHLER"; return nil }
+    }
+
+    private func fetchWebSearch(_ cmd:String) async -> String? {
+        internetStatus="INTERNETSUCHE"
+        let encoded=cmd.addingPercentEncoding(withAllowedCharacters:.urlQueryAllowed) ?? cmd
+        guard let url=URL(string:"https://html.duckduckgo.com/html/?q=\(encoded)") else{return nil}
+        do {
+            var req=URLRequest(url:url); req.timeoutInterval=15
+            req.setValue("Mozilla/5.0 Jarvis-ZERO",forHTTPHeaderField:"User-Agent")
+            let (data,resp)=try await URLSession.shared.data(for:req)
+            guard (resp as? HTTPURLResponse)?.statusCode == 200,
+                  let html=String(data:data,encoding:.utf8) else{return nil}
+            let regex=try NSRegularExpression(pattern:"<a[^>]*class=\"result__a\"[^>]*>(.*?)</a>.*?<a[^>]*class=\"result__snippet\"[^>]*>(.*?)</a>",options:[.dotMatchesLineSeparators,.caseInsensitive])
+            let ns=html as NSString
+            let matches=regex.matches(in:html,range:NSRange(location:0,length:ns.length))
+            let snippets=matches.prefix(5).compactMap { m -> String? in
+                guard m.numberOfRanges > 2 else{return nil}
+                return "\(stripHTML(ns.substring(with:m.range(at:1)))): \(stripHTML(ns.substring(with:m.range(at:2))))"
+            }
+            guard !snippets.isEmpty else{return nil}
+            internetStatus="BEREIT"
+            if localAI {
+                return await askOllamaRaw("""
+                Beantworte die Nutzerfrage ausschließlich anhand der folgenden aktuellen Suchtreffer.
+                Antworte auf Deutsch, knapp und erwähne Unsicherheit, wenn die Treffer nicht eindeutig sind.
+                Nutzerfrage: \(cmd)
+                Suchtreffer:
+                \(snippets.joined(separator:"\n"))
+                """) ?? snippets.prefix(3).joined(separator:" ")
+            }
+            return snippets.prefix(3).joined(separator:" ")
+        } catch { internetStatus="INTERNETFEHLER"; return nil }
+    }
+
+    private func openGeneralTarget(_ name:String) -> Bool {
+        let clean=name.trimmingCharacters(in:.whitespacesAndNewlines.union(.punctuationCharacters))
+        guard !clean.isEmpty else{return false}
+        let lower=clean.lowercased()
+        let home=FileManager.default.homeDirectoryForCurrentUser
+        let known:[String:URL]=[
+            "downloads":home.appendingPathComponent("Downloads"),
+            "download":home.appendingPathComponent("Downloads"),
+            "schreibtisch":home.appendingPathComponent("Desktop"),
+            "desktop":home.appendingPathComponent("Desktop"),
+            "dokumente":home.appendingPathComponent("Documents"),
+            "dokument":home.appendingPathComponent("Documents"),
+            "programme":URL(fileURLWithPath:"/Applications"),
+            "applications":URL(fileURLWithPath:"/Applications")
+        ]
+        if let url=known[lower] {
+            return NSWorkspace.shared.open(url)
+        }
+
+        let openApp=runProcess("/usr/bin/open",["-a",clean])
+        if openApp == 0 { return true }
+
+        if let result=runCapture("/usr/bin/mdfind",["kMDItemFSName == '*\(clean.replacingOccurrences(of:"'",with:""))*'cd"]),
+           let first=result.split(separator:"\n").first,
+           !first.isEmpty {
+            return NSWorkspace.shared.open(URL(fileURLWithPath:String(first)))
+        }
+        return false
+    }
+
+    func execute(_ cmd:String) async {
+        status="VERARBEITUNG"; cpuPulse=0.9
+        defer { if !speaking { status=listening ? "HÖRT ZU":"BEREIT" }; cpuPulse=0.22 }
+        let developerActivationPhrases=[
+            "geh in den entwicklermodus",
+            "gehe in den entwicklermodus",
+            "entwicklermodus aktivieren"
+        ]
+        if let activation=developerActivationPhrases.compactMap({ phrase -> (String, Range<String.Index>)? in
+            guard let range=cmd.range(of:phrase) else{return nil}
+            return (phrase,range)
+        }).first {
+            var remainder=String(cmd[activation.1.upperBound...])
+                .trimmingCharacters(in:.whitespacesAndNewlines.union(.punctuationCharacters))
+            for prefix in ["und dann ","und ","dann ","bitte "] {
+                if remainder.hasPrefix(prefix) {
+                    remainder=String(remainder.dropFirst(prefix.count))
+                        .trimmingCharacters(in:.whitespacesAndNewlines.union(.punctuationCharacters))
+                    break
+                }
+            }
+
+            if !developerMode {
+                enterDeveloperMode()
+            }
+
+            guard developerMode else{return}
+
+            // Ein kombinierter Befehl wie "Geh in den Entwicklermodus und ändere ..."
+            // darf den eigentlichen Entwicklungsauftrag nicht mehr abschneiden.
+            if remainder.count > 2 {
+                await processDeveloperInstruction(remainder)
+            } else if developerMode {
+                developmentStatus="ENTWICKLERMODUS AKTIV // WARTE AUF AUFTRAG"
+            }
+            return
+        }
+
+        if developerMode && (cmd.contains("entwicklermodus beenden") || cmd.contains("entwicklermodus verlassen")) {
+            leaveDeveloperMode()
+            return
+        }
+
+        if awaitingDeveloperInstallConfirmation {
+            if cmd == "ja" || cmd.contains("ja installieren") || cmd.contains("installieren") || cmd.contains("übernehmen") {
+                installDeveloperCandidate()
+                return
+            }
+            if cmd == "nein" || cmd.contains("nicht installieren") || cmd.contains("abbrechen") {
+                awaitingDeveloperInstallConfirmation=false
+                developmentStatus="ENTWICKLUNG BEREIT"
+                speak("In Ordnung. Die geprüfte Entwicklung bleibt gespeichert und wird nicht installiert.")
+                return
+            }
+        }
+
+        if developerMode {
+            await processDeveloperInstruction(cmd)
+            return
+        }
+        if cmd.hasPrefix("mein ort ist ") || cmd.hasPrefix("mein standort ist ") {
+            let location=cmd.replacingOccurrences(of:"mein ort ist ",with:"").replacingOccurrences(of:"mein standort ist ",with:"")
+            setDefaultLocation(location)
+            speak("Ich verwende \(defaultLocation) künftig als deinen Standardort für Wetterabfragen.")
+            return
+        }
+        if cmd.hasPrefix("merke dir ") || cmd.hasPrefix("merk dir ") || cmd.hasPrefix("lerne ") {
+            let text=cmd
+                .replacingOccurrences(of:"merke dir ",with:"")
+                .replacingOccurrences(of:"merk dir ",with:"")
+                .replacingOccurrences(of:"lerne ",with:"")
+                .trimmingCharacters(in:.whitespacesAndNewlines)
+            if !text.isEmpty {
+                remember(text)
+                speak("Das habe ich gespeichert.")
+                return
+            }
+        }
+        if cmd == "was hast du gelernt" || cmd.contains("was weißt du über mich") {
+            if memory.isEmpty {
+                speak("Mein lokales Gedächtnis ist noch leer.")
+            } else {
+                speak("Ich habe aktuell \(memory.count) gespeicherte Informationen.")
+            }
+            return
+        }
+        if cmd.contains("entwickle dich weiter") || cmd.contains("selbstentwicklung starten") {
+            speak("Ich starte einen Entwicklungszyklus und prüfe den Kandidaten lokal.")
+            await runSelfDevelopmentCycle()
+            speak(candidateReady ? "Ein geprüfter Entwicklungskandidat ist bereit." : "Der Kandidat hat meine Prüfung nicht bestanden und wurde verworfen.")
+            return
+        }
+        if cmd.contains("öffne safari") { await openBundle("com.apple.Safari","Safari"); return }
+        if cmd.contains("öffne finder") { await openBundle("com.apple.finder","Finder"); return }
+        if cmd.contains("öffne mail") { await openBundle("com.apple.mail","Mail"); return }
+        if cmd.contains("öffne kalender") { await openBundle("com.apple.iCal","Kalender"); return }
+        if cmd.contains("öffne notizen") { await openBundle("com.apple.Notes","Notizen"); return }
+        if cmd.contains("öffne systemeinstellungen") || cmd.contains("öffne einstellungen") { await openBundle("com.apple.systempreferences","Systemeinstellungen"); return }
+        if cmd.contains("öffne rechner") || cmd.contains("öffne taschenrechner") { await openBundle("com.apple.calculator","Rechner"); return }
+        if cmd.hasPrefix("öffne ") || cmd.hasPrefix("starte ") {
+            var target=cmd
+            if target.hasPrefix("öffne ") { target=String(target.dropFirst(6)) }
+            if target.hasPrefix("starte ") { target=String(target.dropFirst(7)) }
+            if openGeneralTarget(target) {
+                speak("\(target) wurde geöffnet.")
+            } else {
+                speak("Ich konnte \(target) auf diesem Mac nicht finden.")
+            }
+            return
+        }
+        if cmd.contains("mach einen screenshot") || cmd.contains("screenshot machen") {
+            let f=DateFormatter(); f.dateFormat="yyyy-MM-dd_HH-mm-ss"
+            let path=FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop/Jarvis-Screenshot-\(f.string(from:Date())).png").path
+            let code=runProcess("/usr/sbin/screencapture",["-x",path])
+            speak(code == 0 ? "Screenshot wurde auf dem Schreibtisch gespeichert." : "Screenshot konnte ich nicht erstellen.")
+            return
+        }
+        if cmd.contains("ton an") || cmd.contains("nicht mehr stumm") || cmd.contains("unmute") {
+            _=runProcess("/usr/bin/osascript",["-e","set volume output muted false"])
+            speak("Ton ist wieder eingeschaltet."); return
+        }
+        if cmd.contains("stumm") || cmd.contains("mute") {
+            _=runProcess("/usr/bin/osascript",["-e","set volume output muted true"])
+            speak("Ton ist stummgeschaltet."); return
+        }
+        if cmd.contains("lautstärke") {
+            let digits=cmd.split(whereSeparator: { !$0.isNumber }).compactMap { Int($0) }
+            if let n=digits.first {
+                let value=max(0,min(100,n))
+                _=runProcess("/usr/bin/osascript",["-e","set volume output volume \(value)"])
+                speak("Lautstärke auf \(value) Prozent."); return
+            }
+        }
+        if cmd.contains("update prüfen") || cmd.contains("prüfe update") || cmd.contains("nach update suchen") {
+            await checkForUpdates()
+            speak(updateAvailable ? "Version \(latestVersion) ist verfügbar." : "Jarvis ist auf dem aktuellen Stand.")
+            return
+        }
+        if cmd.contains("was kannst du") {
+            speak("Ich kann Programme öffnen, im Internet suchen, Uhrzeit und Datum nennen, Screenshots erstellen, Lautstärke steuern, Updates prüfen und mit der lokalen KI antworten.")
+            return
+        }
+        if cmd.hasPrefix("suche ") || cmd.contains("suche im internet") || cmd.contains("google ") {
+            let q=cmd.replacingOccurrences(of:"suche im internet nach",with:"").replacingOccurrences(of:"suche nach",with:"").replacingOccurrences(of:"suche",with:"").replacingOccurrences(of:"google",with:"").trimmingCharacters(in:.whitespaces)
+            if let enc=q.addingPercentEncoding(withAllowedCharacters:.urlQueryAllowed), let u=URL(string:"https://www.google.com/search?q=\(enc)"){ NSWorkspace.shared.open(u); speak("Ich habe die Internetsuche nach \(q) geöffnet."); return }
+        }
+        if cmd.contains("wie spät") || cmd.contains("uhrzeit") { let f=DateFormatter(); f.timeStyle = .short; speak("Es ist \(f.string(from:Date())) Uhr."); return }
+        if cmd.contains("welcher tag") || cmd.contains("datum") { let f=DateFormatter(); f.dateStyle = .full; f.locale=Locale(identifier:"de_DE"); speak("Heute ist \(f.string(from:Date()))."); return }
+        let route=await decideRoute(cmd)
+        lastRoute=route.rawValue
+        switch route {
+        case .weather:
+            speak(await fetchWeather(cmd) ?? "Die Wetterabfrage ist gerade fehlgeschlagen.")
+            return
+        case .news:
+            speak(await fetchNews(cmd) ?? "Ich konnte die aktuellen Nachrichten gerade nicht abrufen.")
+            return
+        case .web:
+            speak(await fetchWebSearch(cmd) ?? "Die Internetsuche ist gerade fehlgeschlagen.")
+            return
+        case .localAI:
+            if localAI, let answer=await askOllama(cmd) { speak(answer) }
+            else { speak("Für diese Frage brauche ich meine lokale KI. Sobald Ollama eingerichtet ist, kann ich sie direkt beantworten.") }
+            return
+        case .memory, .mac:
+            if localAI, let answer=await askOllama(cmd) { speak(answer) }
+            else { speak("Dafür fehlt mir noch die lokale KI.") }
+            return
+        }
+    }
+    func askOllama(_ prompt:String) async -> String? {
+        let memories = memoryContext()
+        let context = recentContext.suffix(12).joined(separator:"\n")
+        let fullPrompt = """
+        Du bist Jarvis, ein deutschsprachiger persönlicher macOS-Assistent.
+        Antworte ausschließlich auf Deutsch, natürlich, präzise und knapp.
+        Nutze gespeicherte Informationen nur, wenn sie zur aktuellen Frage passen.
+        Behaupte niemals, eine Mac-Aktion ausgeführt zu haben, wenn sie nicht tatsächlich ausgeführt wurde.
+
+        Gespeichertes Gedächtnis:
+        \(memories)
+
+        Letzter Gesprächskontext:
+        \(context)
+
+        Nutzer: \(prompt)
+        """
+        guard let answer = await askOllamaRaw(fullPrompt) else { return nil }
+        addContext("Nutzer", prompt)
+        addContext("Jarvis", answer)
+        return answer
+    }
+
+    private func askOllamaRaw(_ prompt:String) async -> String? {
+        guard let u=URL(string:"http://127.0.0.1:11434/api/generate") else{return nil}
+        let model = localAIModel == "NICHT VERBUNDEN" || localAIModel == "KEIN MODELL" ? "qwen2.5:3b" : localAIModel
+        let body:[String:Any] = ["model":model,"prompt":prompt,"stream":false]
+        guard let data=try? JSONSerialization.data(withJSONObject:body) else{return nil}
+        var r=URLRequest(url:u)
+        r.httpMethod="POST"
+        r.httpBody=data
+        r.timeoutInterval=120
+        r.setValue("application/json",forHTTPHeaderField:"Content-Type")
+        do {
+            let (d,response)=try await URLSession.shared.data(for:r)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else{return nil}
+            let o=try JSONSerialization.jsonObject(with:d) as? [String:Any]
+            return (o?["response"] as? String)?.trimmingCharacters(in:.whitespacesAndNewlines)
+        } catch {
+            return nil
+        }
+    }
+}
+
+
+
+// ===== JarvisVisualState.swift =====
+import SwiftUI
+
+enum JarvisSystemState: Equatable {
+    case ready
+    case listening
+    case thinking
+    case speaking
+    case programming
+    case updating(progress: Double)
+    case error
+}
+
+enum JarvisModuleType: String, CaseIterable, Identifiable {
+    case mac = "MAC"
+    case ai = "KI"
+    case claude = "CLAUDE"
+    case internet = "INTERNET"
+    case memory = "GEDÄCHTNIS"
+    case devices = "GERÄTE"
+    case automation = "AUTOMATION"
+    case system = "SYSTEM"
+    case update = "UPDATE"
+    case dev = "ENTWICKLUNG"
+    
+    var id: String { self.rawValue }
+    
+    var icon: String {
+        switch self {
+        case .mac: return "desktopcomputer"
+        case .ai: return "cpu"
+        case .claude: return "terminal"
+        case .internet: return "globe"
+        case .memory: return "brain"
+        case .devices: return "laptopcomputer.and.iphone"
+        case .automation: return "gearshape.2"
+        case .system: return "command"
+        case .update: return "arrow.clockwise.circle"
+        case .dev: return "hammer"
+        }
+    }
+}
+
+// ===== JarvisVoiceController.swift =====
+import SwiftUI
+import AVFoundation
+
+@MainActor
+class JarvisVoiceController: NSObject, ObservableObject {
+    private let synthesizer = AVSpeechSynthesizer()
+    @Published var isSpeaking = false
+    
+    // Interface zum HUD-State
+    var onStateChange: ((JarvisSystemState) -> Void)?
+    
+    override init() {
+        super.init()
+        synthesizer.delegate = self
+    }
+    
+    func speak(_ text: String) {
+        // Text-Segmentierung für natürliche Prosodie
+        let segments = segmentText(text)
+        
+        for segment in segments {
+            let utterance = AVSpeechUtterance(string: segment)
+            
+            // KONFIGURATION: Cineastische KI-Stimme (Deutsch)
+            // Wir suchen nach einer tiefen, ruhigen Stimme. 
+            // Falls 'Yannick' oder 'Tessa' nicht verfügbar sind, wird die Standard-Deutsch-Stimme genutzt.
+            utterance.voice = AVSpeechSynthesisVoice(language: "de-DE")
+            
+            utterance.rate = 0.48 // Ruhig, nicht hektisch
+            utterance.pitchMultiplier = 0.85 // Tiefer, souveräner Klang
+            utterance.volume = 1.0
+            
+            synthesizer.speak(utterance)
+        }
+    }
+    
+    func stop() {
+        synthesizer.stopSpeaking(at: .immediate)
+        isSpeaking = false
+        onStateChange?(.ready)
+    }
+    
+    private func segmentText(_ text: String) -> [String] {
+        // Teilt den Text an Satzzeichen, um natürliche Pausen zu erzwingen
+        return text.components(separatedBy: CharacterSet(charactersIn: ".!?\n"))
+            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            .map { $0.trimmingCharacters(in: .whitespaces) + "." }
+    }
+}
+
+extension JarvisVoiceController: AVSpeechSynthesizerDelegate {
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didStart utterance: AVSpeechUtterance) {
+        self.isSpeaking = true
+        self.onStateChange?(.speaking)
+    }
+    
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        self.isSpeaking = false
+        // Prüfen, ob noch etwas in der Queue ist, sonst zurück auf ready
+        if synthesizer.isSpeaking {
+            // Weiterhin im speaking state
+        } else {
+            self.onStateChange?(.ready)
+        }
+    }
+}
+
+// ===== JarvisBackgroundView.swift =====
+import SwiftUI
+
+struct Particle: Identifiable {
+    let id = UUID()
+    var position: CGPoint
+    var velocity: CGPoint
+    var size: CGFloat
+    var opacity: Double
+    var layer: Int // Für Parallax-Tiefe
+}
+
+struct JarvisBackgroundView: View {
+    @State private var particles: [Particle] = []
+    var systemState: JarvisSystemState
+    
+    init(systemState: JarvisSystemState) {
+        self.systemState = systemState
+        _particles = State(initialValue: JarvisBackgroundView.createParticles())
+    }
+    
+    static func createParticles() -> [Particle] {
+        var p: [Particle] = []
+        for _ in 0..<120 {
+            p.append(Particle(
+                position: CGPoint(x: CGFloat.random(in: 0...1200), y: CGFloat.random(in: 0...800)),
+                velocity: CGPoint(x: CGFloat.random(in: -0.2...0.2), y: CGFloat.random(in: -0.2...0.2)),
+                size: CGFloat.random(in: 0.5...2.0),
+                opacity: Double.random(in: 0.1...0.4),
+                layer: Int.random(in: 1...3)
+            ))
+        }
+        return p
+    }
+    
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            Canvas { context, size in
+                let time = timeline.date.timeIntervalSinceReferenceDate
+                
+                // State-dependent drift
+                var driftMultiplier: CGFloat = 1.0
+                var color = Color.cyan.opacity(0.3)
+                
+                switch systemState {
+                case .listening: driftMultiplier = 0.5; color = .white.opacity(0.4)
+                case .thinking: driftMultiplier = 3.0; color = .cyan.opacity(0.6)
+                case .speaking: driftMultiplier = 1.5; color = .white.opacity(0.5)
+                case .error: color = .orange.opacity(0.4)
+                default: driftMultiplier = 1.0
+                }
+                
+                for i in 0..<particles.count {
+                    var p = particles[i]
+                    
+                    // Update position based on velocity and time
+                    let x = p.position.x + (p.velocity.x * time * 10 * CGFloat(p.layer) * driftMultiplier)
+                    let y = p.position.y + (p.velocity.y * time * 10 * CGFloat(p.layer) * driftMultiplier)
+                    
+                    // Wrap around screen
+                    let finalX = x.truncatingRemainder(dividingBy: size.width)
+                    let finalY = y.truncatingRemainder(dividingBy: size.height)
+                    
+                    // Subtle twinkle
+                    let twinkle = sin(time * 2 + Double(i)) * 0.1 + p.opacity
+                    
+                    let rect = CGRect(x: finalX, y: finalY, width: p.size, height: p.size)
+                    context.fill(Path(rect), with: .color(color.opacity(twinkle)))
+                    
+                    // Rare connection lines
+                    if i % 30 == 0 && systemState == .thinking {
+                        if let next = particles.last {
+                            var path = Path()
+                            path.move(to: CGPoint(x: finalX, y: finalY))
+                            path.addLine(to: CGPoint(x: size.width/2, y: size.height/2))
+                            context.stroke(path, with: .color(.cyan.opacity(0.05)), lineWidth: 0.5)
+                        }
+                    }
+                }
+            }
+            .ignoresSafeArea()
+        }
+        .background(Color.black)
+    }
+}
+
+// ===== JarvisCoreView.swift =====
+import SwiftUI
+
+struct JarvisCoreView: View {
+    var state: JarvisSystemState
+    
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            Canvas { context, size in
+                let center = CGPoint(x: size.width / 2, y: size.height / 2)
+                let time = timeline.date.timeIntervalSinceReferenceDate
+                
+                // State Parameters
+                var coreColor = Color(red: 0, green: 0.8, blue: 1.0)
+                var pulse = 1.0
+                var speed = 0.5
+                
+                switch state {
+                case .ready: speed = 0.3
+                case .listening: 
+                    pulse = 1.0 + sin(time * 4) * 0.1
+                    speed = 0.7
+                case .thinking: 
+                    speed = 2.5
+                    coreColor = .white
+                case .speaking: 
+                    pulse = 1.0 + sin(time * 8) * 0.2
+                    speed = 0.8
+                case .programming: 
+                    speed = 1.2
+                    coreColor = .white
+                case .updating: speed = 0.2
+                case .error: coreColor = .orange
+                }
+                
+                // LAYER 1: Deep Core Glow
+                let innerGlow = Path(ellipseIn: CGRect(x: center.x - 30 * pulse, y: center.y - 30 * pulse, width: 60 * pulse, height: 60 * pulse))
+                context.fill(innerGlow, with: .color(coreColor.opacity(0.4)))
+                
+                // LAYER 2: Rotating Data Rings (Outer)
+                for ringIdx in 1...3 {
+                    let ringRadius = CGFloat(ringIdx * 40) * pulse
+                    let ringSpeed = speed * (1.0 / CGFloat(ringIdx))
+                    let ringAngle = time * ringSpeed
+                    
+                    for i in 0..<12 {
+                        let angle = ringAngle + (CGFloat(i) * CGFloat.pi * 2.0 / 12.0)
+                        let px = center.x + cos(angle) * ringRadius
+                        let py = center.y + sin(angle) * ringRadius
+                        
+                        context.fill(Path(ellipseIn: CGRect(x: px-2, y: py-2, width: 4, height: 4)), with: .color(coreColor.opacity(0.6)))
+                        
+                        // Connect to core
+                        var line = Path()
+                        line.move(to: CGPoint(x: px, y: py))
+                        line.addLine(to: center)
+                        context.stroke(line, with: .color(coreColor.opacity(0.1)), lineWidth: 0.5)
+                    }
+                }
+                
+                // LAYER 3: 3D Particle Shell
+                let particleCount = 150
+                for i in 0..<particleCount {
+                    let angle = CGFloat(i) * CGFloat.pi * 2 / CGFloat(particleCount)
+                    let phi = CGFloat(i) * CGFloat.pi / 15
+                    
+                    let x3d = cos(angle + time * speed) * sin(phi)
+                    let y3d = cos(phi)
+                    let z3d = sin(angle + time * speed) * sin(phi)
+                    
+                    let projectX = center.x + x3d * 100 * pulse
+                    let projectY = center.y + y3d * 100 * pulse
+                    let opacity = (z3d + 1) / 2
+                    
+                    let size = z3d > 0 ? 2.0 : 1.0
+                    context.fill(Path(ellipseIn: CGRect(x: projectX - size/2, y: projectY - size/2, width: size, height: size)), 
+                                 with: .color(coreColor.opacity(opacity * 0.7)))
+                }
+                
+                // LAYER 4: Energy Orbits
+                let orbitRadius: CGFloat = 130 * pulse
+                let orbitTime = time * speed * 1.5
+                let ox = center.x + cos(orbitTime) * orbitRadius
+                let oy = center.y + sin(orbitTime) * orbitRadius
+                context.fill(Path(ellipseIn: CGRect(x: ox-4, y: oy-4, width: 8, height: 8)), with: .color(.white.opacity(0.8)))
+                
+                // LAYER 5: State-specific overlays
+                if case .updating(let progress) = state {
+                    var progressPath = Path()
+                    progressPath.addArc(center: center, radius: 140, startAngle: .degrees(0), endAngle: .degrees(progress * 360), clockwise: false)
+                    context.stroke(progressPath, with: .color(.cyan), lineWidth: 3)
+                }
+                
+                if case .error = state {
+                    // Glitch effect
+                    let glitchOffset = CGFloat.random(in: -5...5)
+                    context.fill(Path(CGRect(x: center.x + glitchOffset, y: center.y - 50, width: 100, height: 1)), with: .color(.orange.opacity(0.5)))
+                }
+            }
+        }
+        .frame(width: 400, height: 400)
+    }
+}
+
+// ===== JarvisModuleView.swift =====
+import SwiftUI
+
+struct JarvisModuleView: View {
+    let type: JarvisModuleType
+    var isActive: Bool
+    var isHovered: Bool
+    var action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 15) {
+                ZStack {
+                    Circle()
+                        .fill(isHovered ? Color.white.opacity(0.2) : Color.cyan.opacity(0.1))
+                        .frame(width: 32, height: 32)
+                    
+                    Image(systemName: type.icon)
+                        .font(.system(size: 14, weight: .light))
+                        .foregroundColor(isHovered ? .white : .cyan)
+                }
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(type.rawValue)
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundColor(isHovered ? .white : .cyan.opacity(0.8))
+                    
+                    if isHovered {
+                        Text("SYS_READY // 0x4F")
+                            .font(.system(size: 8, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.5))
+                            .transition(.opacity)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .frame(width: 180, height: 48)
+            .background(
+                ZStack {
+                    // Holographic Glass
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.cyan.opacity(isHovered ? 0.15 : 0.05))
+                    
+                    // Technical Borders
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(Color.cyan.opacity(isHovered ? 0.8 : 0.3), lineWidth: 1)
+                    
+                    // High-tech accents
+                    if isHovered {
+                        Rectangle()
+                            .fill(Color.white)
+                            .frame(width: 2, height: 10)
+                            .position(x: 0, y: 24)
+                    }
+                }
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .scaleEffect(isHovered ? 1.05 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
+    }
+}
+
+// ===== JarvisWorkspaceView.swift =====
+import SwiftUI
+
+struct JarvisWorkspaceView: View {
+    let module: JarvisModuleType
+    var onClose: () -> Void
+    
+    var body: some View {
+        ZStack {
+            // Dark overlay
+            Color.black.opacity(0.85)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    HStack {
+                        Image(systemName: module.icon)
+                            .foregroundColor(.cyan)
+                        Text("\(module.rawValue) INTERFACE")
+                            .font(.system(size: 20, weight: .light, design: .monospaced))
+                            .foregroundColor(.white)
+                    }
+                    Spacer()
+                    Button(action: onClose) {
+                        Image(systemName: "xmark")
+                            .foregroundColor(.white.opacity(0.5))
+                            .padding(8)
+                            .background(Circle().stroke(Color.white.opacity(0.2)))
+                    }.buttonStyle(PlainButtonStyle())
+                }
+                .padding(30)
+                .background(Color.cyan.opacity(0.05))
+                
+                // Main Workspace Area
+                ZStack {
+                    // Technical Grid Background
+                    JarvisGridBackground()
+                    
+                    VStack {
+                        Text("INITIALIZING \(module.rawValue) SUB-SYSTEM...")
+                            .font(.system(size: 14, design: .monospaced))
+                            .foregroundColor(.cyan.opacity(0.7))
+                            .padding(.top, 100)
+                        
+                        Spacer()
+                        
+                        // Placeholder for real backend content
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.cyan.opacity(0.3), lineWidth: 1)
+                            .background(Color.cyan.opacity(0.02))
+                            .frame(maxWidth: 800, maxHeight: 400)
+                            .overlay(
+                                Text("Connect to JarvisCore.\(module.rawValue) bindings required.")
+                                    .foregroundColor(.white.opacity(0.3))
+                                    .font(.system(size: 12, design: .monospaced))
+                            )
+                        
+                        Spacer()
+                    }
+                }
+            }
+        }
+        .transition(.asymmetric(insertion: .move(edge: .bottom), removal: .opacity))
+    }
+}
+
+struct JarvisGridBackground: View {
+    var body: some View {
+        Canvas { context, size in
+            let step: CGFloat = 40
+            for x in stride(from: 0, to: size.width, by: step) {
+                var path = Path()
+                path.move(to: CGPoint(x: x, y: 0))
+                path.addLine(to: CGPoint(x: x, y: size.height))
+                context.stroke(path, with: .color(.cyan.opacity(0.05)), lineWidth: 1)
+            }
+            for y in stride(from: 0, to: size.height, by: step) {
+                var path = Path()
+                path.move(to: CGPoint(x: 0, y: y))
+                path.addLine(to: CGPoint(x: size.width, y: y))
+                context.stroke(path, with: .color(.cyan.opacity(0.05)), lineWidth: 1)
+            }
+        }
+        .ignoresSafeArea()
+    }
+}
+
+// ===== JarvisHUDView.swift =====
+import SwiftUI
+
+struct JarvisHUDView: View {
+    @Binding var systemState: JarvisSystemState
+    @ObservedObject var voiceController: JarvisVoiceController
+    
+    @State private var activeModule: JarvisModuleType? = nil
+    @State private var hoveredModule: JarvisModuleType? = nil
+    @State private var inputText: String = ""
+    
+    var body: some View {
+        ZStack {
+            // Layer 1: Living Background
+            JarvisBackgroundView(systemState: systemState)
+            
+            // Layer 2: Connections
+            if let hovered = hoveredModule {
+                ConnectionLinesView(to: hovered, systemState: systemState)
+            }
+            
+            // Layer 3: Modules Layout
+            GeometryReader { geo in
+                let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
+                
+                ForEach(JarvisModuleType.allCases, id: \.self) { module in
+                    let angle = getAngle(for: module)
+                    let radius: CGFloat = activeModule == nil ? 300 : 450
+                    let x = center.x + cos(angle) * radius
+                    let y = center.y + sin(angle) * radius
+                    
+                    JarvisModuleView(
+                        type: module,
+                        isActive: activeModule == module,
+                        isHovered: hoveredModule == module,
+                        action: {
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                                activeModule = module
+                            }
+                        }
+                    )
+                    .position(x: x, y: y)
+                    .onHover { hovering in
+                        hoveredModule = hovering ? module : nil
+                    }
+                }
+            }
+            
+            // Layer 4: The Core
+            JarvisCoreView(state: systemState)
+                .scaleEffect(activeModule == nil ? 1.0 : 0.5)
+                .offset(x: activeModule == nil ? 0 : -300) // Move core to side when workspace open
+                .animation(.spring(response: 0.7, dampingFraction: 0.8), value: activeModule)
+            
+            // Layer 5: Workspace
+            if let module = activeModule {
+                JarvisWorkspaceView(module: module, onClose: {
+                    withAnimation(.spring()) {
+                        activeModule = nil
+                    }
+                })
+            }
+            
+            // Layer 6: Minimal Input
+            VStack {
+                Spacer()
+                HStack {
+                    Image(systemName: "mic.fill")
+                        .foregroundColor(.cyan)
+                        .padding(.horizontal, 15)
+                    
+                    TextField("Awaiting voice command...", text: $inputText)
+                        .textFieldStyle(PlainTextFieldStyle())
+                        .foregroundColor(.white)
+                        .font(.system(size: 14, design: .monospaced))
+                    
+                    Image(systemName: "arrow.right.circle.fill")
+                        .foregroundColor(.cyan)
+                        .padding(.horizontal, 15)
+                }
+                .frame(width: 450, height: 44)
+                .background(
+                    Capsule()
+                        .fill(Color.cyan.opacity(0.05))
+                        .overlay(Capsule().stroke(Color.cyan.opacity(0.2), lineWidth: 1))
+                )
+                .padding(.bottom, 30)
+            }
+        }
+    }
+    
+    func getAngle(for module: JarvisModuleType) -> CGFloat {
+        let index = JarvisModuleType.allCases.firstIndex(of: module) ?? 0
+        return CGFloat(index) * (2 * .pi / CGFloat(JarvisModuleType.allCases.count))
+    }
+}
+
+struct ConnectionLinesView: View {
+    let to: JarvisModuleType
+    var systemState: JarvisSystemState
+    
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            Canvas { context, size in
+                let center = CGPoint(x: size.width / 2, y: size.height / 2)
+                let index = JarvisModuleType.allCases.firstIndex(of: to) ?? 0
+                let angle = CGFloat(index) * (2 * .pi / CGFloat(JarvisModuleType.allCases.count))
+                let radius: CGFloat = 300
+                let target = CGPoint(x: center.x + cos(angle) * radius, y: center.y + sin(angle) * radius)
+                
+                var path = Path()
+                path.move(to: center)
+                path.addLine(to: target)
+                
+                let opacity = systemState == .thinking ? 0.6 : 0.3
+                context.stroke(path, with: .color(.cyan.opacity(opacity)), lineWidth: 1)
+                
+                // Animated data pulse on the line
+                let time = timeline.date.timeIntervalSinceReferenceDate
+                let pulsePos = (time.truncatingRemainder(dividingBy: 2)) / 2
+                let px = center.x + (target.x - center.x) * CGFloat(pulsePos)
+                let py = center.y + (target.y - center.y) * CGFloat(pulsePos)
+                context.fill(Path(ellipseIn: CGRect(x: px-2, y: py-2, width: 4, height: 4)), with: .color(.white))
+            }
+            .ignoresSafeArea()
+        }
+    }
+}
+
+// ===== JarvisMainContainer.swift =====
+import SwiftUI
+
+struct JarvisMainContainer: View {
+    @State private var systemState: JarvisSystemState = .ready
+    @StateObject private var voiceController = JarvisVoiceController()
+    
+    var body: some View {
+        JarvisHUDView(systemState: $systemState, voiceController: voiceController)
+            .frame(minWidth: 1100, minHeight: 750)
+            .preferredColorScheme(.dark)
+            .onAppear {
+                // Verknüpfe VoiceController mit dem State
+                voiceController.onStateChange = { newState in
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        self.systemState = newState
+                    }
+                }
+            }
+    }
+}
+
+// ===== JarvisIntegration.swift =====
+import SwiftUI
+import AppKit
+
+struct JarvisView: View {
+    @StateObject private var core = JarvisCore()
+    @State private var input = ""
+    @State private var activeModule: JarvisModuleType?
+    @State private var hoveredModule: JarvisModuleType?
+
+    var body: some View {
+        ZStack {
+            JarvisBackgroundView(systemState: systemState)
+
+            if activeModule == nil {
+                moduleLayer
+                    .transition(.opacity)
+            }
+
+            JarvisCoreView(state: systemState)
+                .scaleEffect(activeModule == nil ? 1.0 : 0.55)
+                .offset(x: activeModule == nil ? 0 : -360)
+                .animation(.spring(response: 0.65, dampingFraction: 0.82), value: activeModule)
+
+            if let module = activeModule {
+                JarvisBackendWorkspaceView(core: core, module: module) {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
+                        activeModule = nil
+                    }
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                .zIndex(20)
+            }
+
+            header
+            commandBar
+        }
+        .preferredColorScheme(.dark)
+        .task { await core.boot() }
+    }
+
+    private var systemState: JarvisSystemState {
+        if core.updateStatus.contains("%") {
+            let digits = core.updateStatus.split(whereSeparator: { !$0.isNumber }).compactMap { Double($0) }
+            return .updating(progress: (digits.first ?? 0) / 100.0)
+        }
+        if core.developmentStatus.contains("CLAUDE") ||
+            core.claudeCodeStatus.contains("PROGRAMMIERT") ||
+            (core.developmentProgress > 0.05 && core.developmentProgress < 0.95) {
+            return .programming
+        }
+        if core.speaking { return .speaking }
+        if core.status == "VERARBEITUNG" { return .thinking }
+        if core.listening { return .listening }
+        if core.status.contains("FEHLER") || core.developmentStatus.contains("FEHLER") { return .error }
+        return .ready
+    }
+
+    private var moduleLayer: some View {
+        GeometryReader { geo in
+            let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
+            ForEach(Array(JarvisModuleType.allCases.enumerated()), id: \.element.id) { index, module in
+                let angle = CGFloat(index) * (2 * CGFloat.pi / CGFloat(JarvisModuleType.allCases.count)) - CGFloat.pi / 2
+                let rx = min(geo.size.width * 0.35, 430)
+                let ry = min(geo.size.height * 0.32, 285)
+                let x = center.x + cos(angle) * rx
+                let y = center.y + sin(angle) * ry
+
+                JarvisModuleView(
+                    type: module,
+                    isActive: activeModule == module,
+                    isHovered: hoveredModule == module
+                ) {
+                    withAnimation(.spring(response: 0.55, dampingFraction: 0.82)) {
+                        activeModule = module
+                        hoveredModule = nil
+                    }
+                }
+                .position(x: x, y: y)
+                .onHover { hovering in
+                    hoveredModule = hovering ? module : nil
+                }
+            }
+        }
+        .padding(.horizontal, 40)
+        .padding(.vertical, 70)
+    }
+
+    private var header: some View {
+        VStack {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("J.A.R.V.I.S.")
+                        .font(.system(size: 22, weight: .ultraLight, design: .rounded))
+                        .tracking(7)
+                    Text("NEURALES STEUERSYSTEM // CLAUDE HUD")
+                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                        .tracking(1.6)
+                        .opacity(0.55)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(core.status)
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    Text("ROUTE // \(core.lastRoute)")
+                        .font(.system(size: 8, design: .monospaced))
+                        .opacity(0.55)
+                }
+            }
+            .foregroundStyle(.cyan)
+            .padding(22)
+            Spacer()
+        }
+        .allowsHitTesting(false)
+    }
+
+    private var commandBar: some View {
+        VStack {
+            Spacer()
+            VStack(spacing: 7) {
+                if !core.transcript.isEmpty {
+                    Text(core.transcript)
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .lineLimit(1)
+                }
+
+                HStack(spacing: 12) {
+                    Image(systemName: core.listening ? "waveform" : "mic")
+                        .foregroundStyle(.cyan)
+                    TextField("Mit Jarvis sprechen oder Befehl eingeben …", text: $input)
+                        .textFieldStyle(.plain)
+                        .foregroundStyle(.white)
+                        .font(.system(size: 12, design: .monospaced))
+                        .onSubmit { send() }
+                    Button(action: send) {
+                        Image(systemName: "arrow.right.circle.fill")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.cyan)
+                }
+                .padding(.horizontal, 16)
+                .frame(width: 560, height: 44)
+                .background(.black.opacity(0.80))
+                .overlay(Capsule().stroke(.cyan.opacity(0.35), lineWidth: 1))
+                .clipShape(Capsule())
+
+                HStack(spacing: 16) {
+                    Text("STIMME \(core.listening ? "AKTIV" : "STANDBY")")
+                    Text("KI \(core.localAI ? core.localAIModel : "OFFLINE")")
+                    Text("CLAUDE \(core.claudeCodeAvailable ? "BEREIT" : "OFFLINE")")
+                    Text("UPDATE \(core.updateStatus)")
+                }
+                .font(.system(size: 7, weight: .bold, design: .monospaced))
+                .foregroundStyle(.cyan.opacity(0.45))
+            }
+            .padding(.bottom, 18)
+        }
+    }
+
+    private func send() {
+        let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        input = ""
+        core.submit(text)
+    }
+}
+
+struct JarvisBackendWorkspaceView: View {
+    @ObservedObject var core: JarvisCore
+    let module: JarvisModuleType
+    let onClose: () -> Void
+
+    var body: some View {
+        HStack {
+            Spacer(minLength: 430)
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Image(systemName: module.icon).foregroundStyle(.cyan)
+                    Text("\(module.rawValue) INTERFACE")
+                        .font(.system(size: 20, weight: .light, design: .monospaced))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Button(action: onClose) {
+                        Image(systemName: "xmark")
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Rectangle().fill(.cyan.opacity(0.25)).frame(height: 1)
+                content
+                Spacer()
+            }
+            .padding(28)
+            .frame(maxWidth: 760, maxHeight: 560)
+            .background(.black.opacity(0.90))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(.cyan.opacity(0.42), lineWidth: 1))
+            .shadow(color: .cyan.opacity(0.18), radius: 28)
+            .padding(.trailing, 38)
+        }
+        .padding(.vertical, 90)
+    }
+
+    @ViewBuilder private var content: some View {
+        switch module {
+        case .mac:
+            VStack(alignment: .leading, spacing: 12) {
+                title("MAC-STEUERUNG", "Direkte lokale Aktionen")
+                HStack {
+                    appButton("Safari", "com.apple.Safari", "safari")
+                    appButton("Finder", "com.apple.finder", "folder")
+                    appButton("Mail", "com.apple.mail", "envelope")
+                    appButton("Kalender", "com.apple.iCal", "calendar")
+                }
+            }
+
+        case .ai:
+            VStack(alignment: .leading, spacing: 10) {
+                title("LOKALE KI", core.localAI ? core.localAIModel : "Nicht verbunden")
+                row("OLLAMA", core.localAI ? "VERBUNDEN" : "NICHT BEREIT")
+                row("ROUTER", core.lastRoute)
+                row("SETUP", core.aiSetupStatus)
+                if !core.localAI {
+                    Button(core.aiInstalling ? "KI WIRD EINGERICHTET …" : "KI EINRICHTEN") {
+                        core.confirmAndSetupAI()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.cyan)
+                    .disabled(core.aiInstalling)
+                }
+            }
+
+        case .claude:
+            VStack(alignment: .leading, spacing: 10) {
+                title("CLAUDE CODE", "Entwickler-KI")
+                row("VERBINDUNG", core.claudeCodeAvailable ? "BEREIT" : "NICHT BEREIT")
+                row("STATUS", core.claudeCodeStatus)
+                row("ENTWICKLUNG", core.developmentStatus)
+                Button(core.developerMode ? "ENTWICKLERMODUS BEENDEN" : "ENTWICKLERMODUS STARTEN") {
+                    core.developerMode ? core.leaveDeveloperMode() : core.enterDeveloperMode()
+                }
+                .buttonStyle(.bordered)
+                .tint(core.developerMode ? .green : .cyan)
+            }
+
+        case .internet:
+            VStack(alignment: .leading, spacing: 10) {
+                title("INTERNET", "Web-Routing und öffentliche Informationen")
+                row("STATUS", core.internetStatus)
+                row("LETZTE ROUTE", core.lastRoute)
+                Button("SAFARI ÖFFNEN") {
+                    Task { await core.openBundle("com.apple.Safari", "Safari") }
+                }
+                .buttonStyle(.bordered)
+                .tint(.cyan)
+            }
+
+        case .memory:
+            VStack(alignment: .leading, spacing: 10) {
+                title("GEDÄCHTNIS", "Lokaler Jarvis-Speicher")
+                row("EINTRÄGE", "\(core.memoryCount)")
+                Text("„Merke dir …“ speichert weiterhin lokal im bestehenden JarvisCore.")
+                    .foregroundStyle(.white.opacity(0.62))
+            }
+
+        case .devices:
+            VStack(alignment: .leading, spacing: 10) {
+                title("GERÄTE", "Sichere Kopplung")
+                row("PAIRING", "NOCH NICHT IMPLEMENTIERT")
+                Text("Keine simulierte Verbindung: Das Modul meldet erst Erfolg, wenn eine echte Gegenstelle vorhanden ist.")
+                    .foregroundStyle(.white.opacity(0.62))
+            }
+
+        case .automation:
+            VStack(alignment: .leading, spacing: 10) {
+                title("AUTOMATION", "Lokale Routinen")
+                row("STATUS", "VORBEREITET")
+                Text("Bestehende Jarvis-Aktionen bleiben über Sprache und Texteingabe verfügbar.")
+                    .foregroundStyle(.white.opacity(0.62))
+            }
+
+        case .system:
+            VStack(alignment: .leading, spacing: 10) {
+                title("SYSTEM", "Sprache und Kernstatus")
+                row("STATUS", core.status)
+                row("STIMME", core.voiceLabel)
+                row("DAUERHÖREN", core.continuous ? "AKTIV" : "AUS")
+                Button(core.continuous ? "DAUERHÖREN AUSSCHALTEN" : "DAUERHÖREN EINSCHALTEN") {
+                    core.continuous.toggle()
+                    core.continuous ? core.startListening() : core.stopListening()
+                }
+                .buttonStyle(.bordered)
+                .tint(.cyan)
+            }
+
+        case .update:
+            VStack(alignment: .leading, spacing: 10) {
+                title("UPDATE", "Stabiler GitHub-Updatekanal")
+                row("STATUS", core.updateStatus)
+                row("NEUE VERSION", core.latestVersion)
+                Button("NACH UPDATE SUCHEN") {
+                    Task { await core.checkForUpdates() }
+                }
+                .buttonStyle(.bordered)
+                .tint(.cyan)
+                if core.updateAvailable {
+                    Button("UPDATE INSTALLIEREN") {
+                        core.confirmAndInstallUpdate()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.cyan)
+                }
+            }
+
+        case .dev:
+            VStack(alignment: .leading, spacing: 10) {
+                title("ENTWICKLUNG", "Claude Single-Pass Entwicklung")
+                row("STATUS", core.developmentStatus)
+                row("CLAUDE", core.claudeCodeStatus)
+                ProgressView(value: core.developmentProgress).tint(.cyan)
+                Text("\(core.developmentProgressText) // \(Int(core.developmentProgress * 100)) %")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.cyan)
+                Button(core.developerMode ? "ENTWICKLERMODUS BEENDEN" : "ENTWICKLERMODUS STARTEN") {
+                    core.developerMode ? core.leaveDeveloperMode() : core.enterDeveloperMode()
+                }
+                .buttonStyle(.bordered)
+                .tint(core.developerMode ? .green : .cyan)
+                if core.candidateReady {
+                    Button("GEPRÜFTEN KANDIDATEN INSTALLIEREN") {
+                        core.installDeveloperCandidate()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+                }
+            }
+        }
+    }
+
+    private func title(_ title: String, _ subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .foregroundStyle(.cyan)
+            Text(subtitle)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.55))
+        }
+    }
+
+    private func row(_ key: String, _ value: String) -> some View {
+        HStack {
+            Text(key)
+            Spacer()
+            Text(value).foregroundStyle(.cyan)
+        }
+        .font(.system(size: 10, weight: .medium, design: .monospaced))
+        .foregroundStyle(.white.opacity(0.62))
+    }
+
+    private func appButton(_ name: String, _ id: String, _ icon: String) -> some View {
+        Button {
+            Task { await core.openBundle(id, name) }
+        } label: {
+            VStack(spacing: 6) {
+                Image(systemName: icon)
+                Text(name)
+            }
+            .frame(width: 92, height: 62)
+        }
+        .buttonStyle(.bordered)
+        .tint(.cyan)
+    }
+}
