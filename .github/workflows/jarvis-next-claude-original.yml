@@ -1,0 +1,37 @@
+name: Jarvis Next Claude Original Compile
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'jarvis-next-review/0.1.0/**'
+      - '.github/workflows/jarvis-next-claude-original.yml'
+
+jobs:
+  compile:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile untouched Claude Jarvis Next sources
+        run: |
+          set -o pipefail
+          mkdir -p /tmp/jarvisnext
+          xcrun swiftc -parse-as-library \
+            jarvis-next-review/0.1.0/JarvisSystemState.swift \
+            jarvis-next-review/0.1.0/JarvisCore.swift \
+            jarvis-next-review/0.1.0/JarvisRouter.swift \
+            jarvis-next-review/0.1.0/JarvisSpeechRecognizer.swift \
+            jarvis-next-review/0.1.0/JarvisVoiceEngine.swift \
+            jarvis-next-review/0.1.0/JarvisAIProvider.swift \
+            jarvis-next-review/0.1.0/JarvisMemoryManager.swift \
+            jarvis-next-review/0.1.0/JarvisInternetProvider.swift \
+            jarvis-next-review/0.1.0/JarvisMacController.swift \
+            jarvis-next-review/0.1.0/JarvisUpdater.swift \
+            jarvis-next-review/0.1.0/JarvisParticleField.swift \
+            jarvis-next-review/0.1.0/JarvisCoreView.swift \
+            jarvis-next-review/0.1.0/JarvisModuleView.swift \
+            jarvis-next-review/0.1.0/JarvisWorkspaceView.swift \
+            jarvis-next-review/0.1.0/JarvisHUDView.swift \
+            jarvis-next-review/0.1.0/JarvisZeroApp.swift \
+            -o /tmp/jarvisnext/JarvisNext \
+            -framework SwiftUI -framework AppKit -framework AVFoundation -framework Speech -framework Combine
