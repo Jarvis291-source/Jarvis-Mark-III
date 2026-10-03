@@ -1,0 +1,33 @@
+name: Jarvis 2.4 Integration Build
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'integration-review/2.4.0/**'
+      - '.github/workflows/jarvis-2-4-integration.yml'
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile full Jarvis backend plus unchanged Claude HUD
+        run: |
+          set -o pipefail
+          mkdir -p /tmp/jarvis24
+          xcrun swiftc \
+            integration-review/2.4.0/JarvisBackend.swift \
+            integration-review/2.4.0/JarvisVisualState.swift \
+            integration-review/2.4.0/JarvisVoiceController.swift \
+            integration-review/2.4.0/JarvisBackgroundView.swift \
+            integration-review/2.4.0/JarvisCoreView.swift \
+            integration-review/2.4.0/JarvisModuleView.swift \
+            integration-review/2.4.0/JarvisWorkspaceView.swift \
+            integration-review/2.4.0/JarvisHUDView.swift \
+            integration-review/2.4.0/JarvisMainContainer.swift \
+            integration-review/2.4.0/JarvisIntegration.swift \
+            -o /tmp/jarvis24/JarvisZero \
+            -framework SwiftUI -framework AppKit -framework AVFoundation -framework Speech
+          test -x /tmp/jarvis24/JarvisZero
+          file /tmp/jarvis24/JarvisZero
