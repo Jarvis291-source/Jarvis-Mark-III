@@ -2010,34 +2010,59 @@ struct JarvisBackgroundView: View {
             )
             .ignoresSafeArea()
 
-            Canvas { context, size in
-                for i in 0..<90 {
-                    let a = Double(i) * 12.9898
-                    let b = Double(i) * 78.233
-                    let nx = abs(sin(a) * 43758.5453).truncatingRemainder(dividingBy: 1)
-                    let ny = abs(sin(b) * 24634.6345).truncatingRemainder(dividingBy: 1)
-                    let x = CGFloat(nx) * size.width
-                    let y = CGFloat(ny) * size.height
-                    let r: CGFloat = i.isMultiple(of: 11) ? 1.5 : 0.8
-                    let rect = CGRect(x: x, y: y, width: r, height: r)
-                    context.fill(Path(ellipseIn: rect), with: .color(.cyan.opacity(i.isMultiple(of: 7) ? 0.28 : 0.12)))
-                }
+            TimelineView(.animation(minimumInterval: 1.0 / 24.0)) { timeline in
+                Canvas { context, size in
+                    let time = timeline.date.timeIntervalSinceReferenceDate
 
-                let step: CGFloat = 72
-                for x in stride(from: 0, through: size.width, by: step) {
-                    var p = Path()
-                    p.move(to: CGPoint(x: x, y: 0))
-                    p.addLine(to: CGPoint(x: x, y: size.height))
-                    context.stroke(p, with: .color(.cyan.opacity(0.022)), lineWidth: 0.5)
-                }
-                for y in stride(from: 0, through: size.height, by: step) {
-                    var p = Path()
-                    p.move(to: CGPoint(x: 0, y: y))
-                    p.addLine(to: CGPoint(x: size.width, y: y))
-                    context.stroke(p, with: .color(.cyan.opacity(0.022)), lineWidth: 0.5)
+                    // Deterministisch zufällige Startpunkte + kontinuierliche Bewegung.
+                    // Dadurch verändert sich der Hintergrund permanent, ohne hektisches
+                    // Neuwürfeln aller Partikel in jedem einzelnen Frame.
+                    for i in 0..<105 {
+                        let seed = Double(i + 1)
+                        let baseX = pseudoRandom(seed * 12.9898)
+                        let baseY = pseudoRandom(seed * 78.233)
+                        let phase = pseudoRandom(seed * 39.425) * Double.pi * 2.0
+                        let speed = 0.018 + pseudoRandom(seed * 91.731) * 0.050
+                        let driftX = sin(time * speed + phase) * (0.035 + pseudoRandom(seed * 17.117) * 0.055)
+                        let driftY = cos(time * speed * 0.73 + phase * 1.31) * (0.025 + pseudoRandom(seed * 53.917) * 0.045)
+
+                        let normalizedX = wrapped(baseX + driftX + time * speed * 0.004)
+                        let normalizedY = wrapped(baseY + driftY + time * speed * 0.002)
+                        let x = CGFloat(normalizedX) * size.width
+                        let y = CGFloat(normalizedY) * size.height
+
+                        let shimmer = 0.5 + 0.5 * sin(time * (0.35 + speed * 8.0) + phase)
+                        let bright = i.isMultiple(of: 9)
+                        let radius: CGFloat = bright ? 1.8 : (i.isMultiple(of: 4) ? 1.15 : 0.75)
+                        let opacity = (bright ? 0.18 : 0.07) + shimmer * (bright ? 0.30 : 0.12)
+
+                        let rect = CGRect(x: x - radius/2, y: y - radius/2, width: radius, height: radius)
+                        context.fill(Path(ellipseIn: rect), with: .color(.cyan.opacity(opacity)))
+
+                        if bright {
+                            let halo = CGRect(x: x - 4, y: y - 4, width: 8, height: 8)
+                            context.fill(Path(ellipseIn: halo), with: .color(.cyan.opacity(0.018 + shimmer * 0.025)))
+                        }
+                    }
+
+                    // Sehr dezentes technisches Raster bleibt im Hintergrund.
+                    let step: CGFloat = 72
+                    for x in stride(from: 0, through: size.width, by: step) {
+                        var p = Path()
+                        p.move(to: CGPoint(x: x, y: 0))
+                        p.addLine(to: CGPoint(x: x, y: size.height))
+                        context.stroke(p, with: .color(.cyan.opacity(0.020)), lineWidth: 0.5)
+                    }
+                    for y in stride(from: 0, through: size.height, by: step) {
+                        var p = Path()
+                        p.move(to: CGPoint(x: 0, y: y))
+                        p.addLine(to: CGPoint(x: size.width, y: y))
+                        context.stroke(p, with: .color(.cyan.opacity(0.020)), lineWidth: 0.5)
+                    }
                 }
             }
             .ignoresSafeArea()
+            .allowsHitTesting(false)
 
             RadialGradient(
                 colors: [.clear, .black.opacity(0.78)],
@@ -2046,7 +2071,17 @@ struct JarvisBackgroundView: View {
                 endRadius: 900
             )
             .ignoresSafeArea()
+            .allowsHitTesting(false)
         }
+    }
+
+    private func pseudoRandom(_ seed: Double) -> Double {
+        abs(sin(seed) * 43758.5453123).truncatingRemainder(dividingBy: 1.0)
+    }
+
+    private func wrapped(_ value: Double) -> Double {
+        let r = value.truncatingRemainder(dividingBy: 1.0)
+        return r < 0 ? r + 1.0 : r
     }
 }
 
