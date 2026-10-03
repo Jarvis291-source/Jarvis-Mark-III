@@ -4,7 +4,7 @@ struct JarvisCoreView: View {
     var state: JarvisSystemState
     
     var body: some View {
-        TimelineView(.animation) { timeline in
+        TimelineView<TimelineView.AnimationSchedule>(.animation) { timeline in
             Canvas { context, size in
                 let center = CGPoint(x: size.width / 2, y: size.height / 2)
                 let time = timeline.date.timeIntervalSinceReferenceDate
