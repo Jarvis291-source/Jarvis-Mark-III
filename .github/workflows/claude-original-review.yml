@@ -8,20 +8,34 @@ on:
       - '.github/workflows/claude-original-review.yml'
 
 jobs:
-  typecheck-original-claude-code:
+  voice:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - name: Typecheck unchanged Claude Swift files
-        run: |
-          set -o pipefail
-          xcrun swiftc -typecheck \
-            claude-review/2.4.0-original/JarvisVisualState.swift \
-            claude-review/2.4.0-original/JarvisVoiceController.swift \
-            claude-review/2.4.0-original/JarvisBackgroundView.swift \
-            claude-review/2.4.0-original/JarvisCoreView.swift \
-            claude-review/2.4.0-original/JarvisModuleView.swift \
-            claude-review/2.4.0-original/JarvisWorkspaceView.swift \
-            claude-review/2.4.0-original/JarvisHUDView.swift \
-            claude-review/2.4.0-original/JarvisMainContainer.swift \
-            -framework SwiftUI -framework AppKit -framework AVFoundation
+      - run: xcrun swiftc -typecheck claude-review/2.4.0-original/JarvisVisualState.swift claude-review/2.4.0-original/JarvisVoiceController.swift -framework SwiftUI -framework AVFoundation
+  background:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: xcrun swiftc -typecheck claude-review/2.4.0-original/JarvisVisualState.swift claude-review/2.4.0-original/JarvisBackgroundView.swift -framework SwiftUI
+  core:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: xcrun swiftc -typecheck claude-review/2.4.0-original/JarvisVisualState.swift claude-review/2.4.0-original/JarvisCoreView.swift -framework SwiftUI
+  module:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: xcrun swiftc -typecheck claude-review/2.4.0-original/JarvisVisualState.swift claude-review/2.4.0-original/JarvisModuleView.swift -framework SwiftUI
+  workspace:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: xcrun swiftc -typecheck claude-review/2.4.0-original/JarvisVisualState.swift claude-review/2.4.0-original/JarvisWorkspaceView.swift -framework SwiftUI
+  all-original:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          xcrun swiftc -typecheck claude-review/2.4.0-original/*.swift -framework SwiftUI -framework AppKit -framework AVFoundation
