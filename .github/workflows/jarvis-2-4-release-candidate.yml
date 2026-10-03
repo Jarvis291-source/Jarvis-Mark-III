@@ -16,7 +16,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p /tmp/jarvis24rc
-          xcrun swiftc release-candidate/2.4.0/JarvisZero.swift \
+          xcrun swiftc -parse-as-library release-candidate/2.4.0/JarvisZero.swift \
             -o /tmp/jarvis24rc/JarvisZero \
             -framework SwiftUI -framework AppKit -framework AVFoundation -framework Speech
           test -x /tmp/jarvis24rc/JarvisZero
