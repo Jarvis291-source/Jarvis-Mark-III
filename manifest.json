@@ -1,23 +1,21 @@
 {
   "app": "Jarvis-ZERO",
   "channel": "stable",
-  "currentVersion": "2.2.0",
-  "latestVersion": "2.3.0",
-  "build": 230,
+  "currentVersion": "2.3.0",
+  "latestVersion": "2.4.0",
+  "build": 240,
   "minimumSupportedVersion": "1.8.3",
   "updateAvailable": true,
-  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/2.3.0/JarvisZero.swift",
-  "sha256": "cb4ec8ce7fa98ec8cff878c628874e668f09745f83d7065f18374cff062eb927",
+  "package": "https://raw.githubusercontent.com/Jarvis291-source/Jarvis-Mark-III/main/releases/2.4.0/JarvisZero.swift",
+  "sha256": "aa3edf06839d74ad3aaf8dbfa5d666540de7d98c07ea58c66242248ea45e8de5",
   "mandatory": false,
   "releaseNotes": [
-    "Kompletter holografischer HUD-Umbau auf Basis des extern erstellten Claude-UI-Entwurfs.",
-    "Neuer zentraler JARVIS CORE als animierte Partikelkugel mit Zuständen für Bereit, Zuhören, Denken, Sprechen, Claude-Entwicklung, Update und Fehler.",
-    "Lebendiger Partikelhintergrund mit kontinuierlicher Bewegung, unterschiedlichen Geschwindigkeiten, Richtungen und Funkeln.",
-    "Zehn holografische Module rund um den Core: MAC, KI, CLAUDE, INTERNET, GEDÄCHTNIS, GERÄTE, AUTOMATION, SYSTEM, UPDATE und ENTWICKLUNG.",
-    "Hover-Verbindungslinien und animierte Modul-Workspaces.",
-    "Bestehendes JarvisCore-Backend bleibt erhalten und ist mit Sprache, Ollama, Claude Code, Internet, Gedächtnis, Update und Entwicklermodus verbunden.",
-    "Single-Pass Claude-Entwicklungsmodus aus 2.2.0 bleibt erhalten.",
-    "Swift-Validierung und vollständiger macOS-Compile-Check erfolgreich bestanden.",
-    "Manifest für den öffentlichen Updateabruf erneut veröffentlicht."
+    "Claude-HUD als neue visuelle Schicht integriert und gegen den echten JarvisCore 2.3.0 gebunden.",
+    "Alle acht von Claude gelieferten Swift-Komponenten wurden vor der Integration unverändert mit dem macOS-Compiler geprüft.",
+    "Zentraler animierter Core, dynamischer Partikelhintergrund und zehn holografische Module bleiben erhalten.",
+    "MAC, lokale KI/Ollama, Claude Code, Internet, Gedächtnis, System, Update und Entwicklung sind mit den bestehenden Jarvis-Funktionen verbunden.",
+    "Dauerhafte Spracheingabe, Mac-Steuerung, lokales Gedächtnis, Update, Backup, Rollback und Single-Pass-Claude-Entwicklung bleiben erhalten.",
+    "Entwickler-Workspace unterstützt die neue 2.4.0-Komponentenstruktur und weiterhin den älteren 2.3.x-Split.",
+    "Exakter Ein-Datei-Updater-Payload erfolgreich kompiliert, ad-hoc signiert und als vollständiger macOS-Build geprüft."
   ]
 }
