@@ -41,8 +41,7 @@ class JarvisVoiceController: NSObject, ObservableObject {
     
     private func segmentText(_ text: String) -> [String] {
         // Teilt den Text an Satzzeichen, um natürliche Pausen zu erzwingen
-        return text.components(separatedBy: CharacterSet(charactersIn: ".!?
-"))
+        return text.components(separatedBy: CharacterSet(charactersIn: ".!?\n"))
             .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
             .map { $0.trimmingCharacters(in: .whitespaces) + "." }
     }
